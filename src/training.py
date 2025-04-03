@@ -26,7 +26,7 @@ def train(
         config.models.name,
         pretrained=config.models.pretrained,
         num_classes=len(df_species_ids),
-        checkpoint_path=config.project_path + config.models.folder + config.models.checkpoint_file,
+        checkpoint_path=os.path.join(config.project_path, config.models.folder, config.models.checkpoint_file),
     )
     model = model.to(device)
     model = model.eval()
