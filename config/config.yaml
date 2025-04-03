@@ -1,0 +1,6 @@
+defaults:
+  - _self_
+
+project_name: "PlantClef2025"
+
+seed: 42

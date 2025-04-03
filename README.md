@@ -23,3 +23,9 @@ First, install the dependencies using uv.
 pipx install uv
 uv sync
 ```
+
+Then, you can run the code using uv.
+
+```bash
+uv run pipeline.py
+```
