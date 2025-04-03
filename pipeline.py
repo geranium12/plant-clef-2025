@@ -1,3 +1,5 @@
+import os
+
 import hydra
 import torch
 from omegaconf import (
@@ -40,10 +42,12 @@ def pipeline(
 
     dataloader = DataLoader(
         dataset=TestDataset(
-            image_folder=config.project_path
-            + config.data.folder
-            + config.data.test_folder
-            + config.data.test_images_folder,
+            image_folder=os.path.join(
+                config.project_path,
+                config.data.folder,
+                config.data.test_folder,
+                config.data.test_images_folder,
+            ),
             patch_size=model_info.input_size,
             stride=int(model_info.input_size / 2),
             use_pad=True,
