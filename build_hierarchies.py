@@ -176,16 +176,6 @@ def main(
     # Read the CSV file
     df_metadata, _, _ = data.load(config)
 
-    # test_data_path = os.path.join(
-    #     config.project_path, config.data.folder, config.data.test_folder
-    # )
-
-    # df_metadata = pd.read_csv(
-    #     os.path.join(test_data_path, config.data.metadata_file),
-    #     sep=";",
-    #     dtype={"partner": str},
-    # )
-
     # Print how many organs has each species in the training dataset
     print_organ_distribution(df_metadata)
 
