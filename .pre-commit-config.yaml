@@ -25,6 +25,7 @@ repos:
               "--select", "RUF",
               "--select", "NPY",
               "--select", "PD",
+              "--ignore", "E501",
               --fix]
         exclude: \.ipynb$
       - id: ruff-format

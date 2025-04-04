@@ -104,7 +104,9 @@ def load(
     pd.DataFrame,
     dict[int, int],
 ]:
-    test_data_path = os.path.join(config.project_path, config.data.folder, config.data.test_folder)
+    test_data_path = os.path.join(
+        config.project_path, config.data.folder, config.data.test_folder
+    )
 
     df_metadata = pd.read_csv(
         os.path.join(test_data_path, config.data.metadata_file),
