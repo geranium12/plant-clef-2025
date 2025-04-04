@@ -1,15 +1,24 @@
 # TODO
 
+#### Hanna
+- [ ] Extract the family -> genus -> species tree
+- [ ] Extract the organ -> species tree
+- [ ] Find datasets on stones, sand, ground, material objects (household objects) - no plants
+
 #### Robin
-- [ ] Set up hydra
-- [ ] Set up WandB
-- [ ] Set up pipeline
+- [ ] Implement data augmentation (tiling, color change, rotation, ...)
+
+#### Tomo
+- [ ] Implement evaluation metric (F1 score)
+- [ ] Resplit the training data
 
 ## Later TODO
-- [ ] Use data augmentation
+- [ ] Implement multi-scale tiling for inference
 - [ ] Finetune ViT Large on plant data
-- [ ] Find datasets on stones, sand, ground, material objects - no plants
-- [ ] Find datasets on household objects
-- [ ] Use organ, genus, family columns from metadata to train a classifier head / 
-- [ ] Use multi-scale tiling
+- [ ] Use trees from metadata to train 4 classifier heads and eval on multiplication of possible options
 - [ ] Integrate the LUCAS no labels dataset
+
+## Done
+- [x] Set up hydra
+- [x] Set up WandB
+- [x] Set up pipeline
