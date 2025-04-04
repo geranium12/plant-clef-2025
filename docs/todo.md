@@ -1,9 +1,9 @@
 # TODO
 
 #### Hanna
-- [ ] Extract the family -> genus -> species tree
-- [ ] Extract the organ -> species tree
-- [ ] Find datasets on stones, sand, ground, material objects (household objects) - no plants
+- [x] Extract the family -> genus -> species tree
+- [x] Extract the organ -> species tree
+- [x] Find datasets on stones, sand, ground, material objects (household objects) - no plants
 
 #### Robin
 - [ ] Implement data augmentation (tiling, color change, rotation, ...)
