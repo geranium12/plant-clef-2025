@@ -11,6 +11,10 @@ data:
   species_file: "species_ids.csv"
   test_folder: "plant_clef_2025_test/"
   test_images_folder: "PlantCLEF2025_test_images/PlantCLEF2025_test_images/"
+  utils:
+    folder: "utils/"
+    plant_taxonomy_file: "plant_taxonomy.json"
+    organ_hierarchy_file: "organ_hierarchy.csv"
 
 models:
   name: "vit_base_patch14_reg4_dinov2.lvd142m"
