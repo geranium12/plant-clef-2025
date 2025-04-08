@@ -24,6 +24,17 @@ models:
   checkpoint_file: "model_onlyclassifier_then_all/model_best.pth.tar"
 
 training:
+  augmentations: [
+    "Identity",
+    "FlipHorizontal",
+    "FlipVertical",
+    "Rotate",
+    "Jitter",
+    "ResizeCrop",
+    "Perspective",
+    "Sharpness",
+    "GaussianBlur",
+  ]
   batch_size: 32
   shuffle: false
   num_workers: 1
