@@ -11,21 +11,16 @@ from omegaconf import (
 )
 from torch.utils.data import (
     DataLoader,
+    Dataset
 )
+import torchvision.transforms as ttransforms
 
 from src.data import TrainDataset
 
 
-def fine_tune(config: DictConfig, model: torch.nn.Module) -> None:
+def fine_tune(config: DictConfig, model: torch.nn.Module, dataset: Dataset) -> None:
     train_loader = DataLoader(
-        dataset=TrainDataset(
-            image_folder=os.path.join(
-                config.project_path,
-                config.data.folder,
-                config.data.train_folder,
-            ),
-            image_size=(config.image_width, config.image_height),
-        ),
+        dataset=dataset,
         batch_size=config.training.batch_size,
         shuffle=config.training.shuffle,
         num_workers=config.training.num_workers,
@@ -59,7 +54,21 @@ def train(
     model = model.to(device)
     model = model.eval()
 
-    fine_tune(config, model)
+    augmentation = ttransforms.Compose(
+        ttransforms.ToTensor(),
+    )
+
+    train_dataset = TrainDataset(
+        image_folder=os.path.join(
+            config.project_path,
+            config.data.folder,
+            config.data.train_folder,
+        ),
+        image_size=(config.image_width, config.image_height),
+        transform=augmentation,
+    )
+
+    fine_tune(config, model, train_dataset)
 
     data_config = timm.data.resolve_model_data_config(model)
     model_info = ModelInfo(
