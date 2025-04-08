@@ -9,12 +9,9 @@ import torch
 from omegaconf import (
     DictConfig,
 )
-from torch.utils.data import (
-    DataLoader,
-    Dataset
-)
-import torchvision.transforms as ttransforms
+from torch.utils.data import DataLoader, Dataset
 
+import src.augmentation
 from src.data import TrainDataset
 
 
@@ -54,21 +51,21 @@ def train(
     model = model.to(device)
     model = model.eval()
 
-    augmentation = ttransforms.Compose(
-        ttransforms.ToTensor(),
-    )
+    augmentations = src.augmentation.create_augmentations(config)
 
-    train_dataset = TrainDataset(
-        image_folder=os.path.join(
-            config.project_path,
-            config.data.folder,
-            config.data.train_folder,
-        ),
-        image_size=(config.image_width, config.image_height),
-        transform=augmentation,
-    )
+    for augmentation_name in config.training.augmentations:
+        augmentation = augmentations[augmentation_name]
+        train_dataset = TrainDataset(
+            image_folder=os.path.join(
+                config.project_path,
+                config.data.folder,
+                config.data.train_folder,
+            ),
+            image_size=(config.image_width, config.image_height),
+            transform=augmentation,
+        )
 
-    fine_tune(config, model, train_dataset)
+        fine_tune(config, model, train_dataset)
 
     data_config = timm.data.resolve_model_data_config(model)
     model_info = ModelInfo(

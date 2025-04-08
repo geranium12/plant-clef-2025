@@ -102,10 +102,10 @@ class TrainDataset(Dataset):  # type: ignore[misc]
         self,
         image_folder: str,
         image_size: tuple[int, int] = (400, 400),
-        transform: ttransforms.transforms = ttransforms.ToTensor(),
+        transform: ttransforms.transforms = None,
     ) -> None:
         self.image_size = image_size
-        self.transform = transform
+        self.transform = transform if transform is not None else ttransforms.ToTensor()
 
         self.samples: list[
             tuple[str, str]
