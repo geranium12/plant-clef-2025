@@ -43,8 +43,9 @@ repos:
     hooks:
     -   id: pytest
         name: pytest
-        entry: .venv/bin/python3
+        entry: .venv/bin/pytest
         language: python
         types: [python]
         pass_filenames: false
         always_run: true
+        files: ^test/
