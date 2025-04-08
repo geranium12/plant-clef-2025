@@ -15,7 +15,7 @@ def test_evaluate_perfect() -> None:
 
 
 def test_evaluate_imperfect() -> None:
-    # Some incorrect predictions: only one out of three predictions is correct
+    # Some incorrect predictions
     # For k=1, the correct prediction is when the argmax equals the true label
     y_true = np.array([0, 1, 2])
     y_pred = np.array(
@@ -36,8 +36,7 @@ def test_evaluate_imperfect() -> None:
 
 
 def test_evaluate_imperfect_2() -> None:
-    # Some incorrect predictions: only one out of three predictions is correct
-    # For k=1, the correct prediction is when the argmax equals the true label
+    # Some incorrect predictions
     y_true = np.array([0, 1, 1, 1, 1, 0, 2, 1, 0, 1])
     y_pred = np.array(
         [
