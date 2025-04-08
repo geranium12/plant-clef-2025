@@ -20,7 +20,7 @@ class PatchDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
         patches: torch.Tensor,
-        transform: ttransforms.Normalize = None,
+        transform: ttransforms.transforms = None,
     ) -> None:
         self.patches = patches.squeeze(0)
         self.transform = transform
@@ -102,9 +102,10 @@ class TrainDataset(Dataset):  # type: ignore[misc]
         self,
         image_folder: str,
         image_size: tuple[int, int] = (400, 400),
+        transform: ttransforms.transforms = ttransforms.ToTensor(),
     ) -> None:
         self.image_size = image_size
-        self.transform = ttransforms.ToTensor()
+        self.transform = transform
 
         self.samples: list[
             tuple[str, str]
