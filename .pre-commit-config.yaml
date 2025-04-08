@@ -38,3 +38,13 @@ repos:
         args: [--strict, --ignore-missing-imports]
         exclude: \.ipynb$
         additional_dependencies: [types-pyyaml, hydra-core, wandb]
+
+-   repo: local
+    hooks:
+    -   id: pytest
+        name: pytest
+        entry: .venv/bin/python3
+        language: python
+        types: [python]
+        pass_filenames: false
+        always_run: true
