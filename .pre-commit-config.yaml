@@ -40,7 +40,7 @@ repos:
             "PD",
             "--ignore",
             "E501",
-            --fix,
+            "--fix",
           ]
         exclude: \.ipynb$
       - id: ruff-format
