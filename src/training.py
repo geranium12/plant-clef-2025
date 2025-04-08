@@ -9,6 +9,31 @@ import torch
 from omegaconf import (
     DictConfig,
 )
+from torch.utils.data import (
+    DataLoader,
+)
+
+from src.data import TrainDataset
+
+
+def fine_tune(config: DictConfig, model: torch.nn.Module) -> None:
+    train_loader = DataLoader(
+        dataset=TrainDataset(
+            image_folder=os.path.join(
+                config.project_path,
+                config.data.folder,
+                config.data.train_folder,
+            ),
+            image_size=(config.image_width, config.image_height),
+        ),
+        batch_size=config.training.batch_size,
+        shuffle=config.training.shuffle,
+        num_workers=config.training.num_workers,
+    )
+
+    for batch_images in train_loader:
+        images, labels = batch_images
+        break  # TODO: Use the data to fine-tune the model
 
 
 @dataclass
@@ -33,6 +58,8 @@ def train(
     )
     model = model.to(device)
     model = model.eval()
+
+    fine_tune(config, model)
 
     data_config = timm.data.resolve_model_data_config(model)
     model_info = ModelInfo(
