@@ -51,10 +51,8 @@ def train(
     model = model.to(device)
     model = model.eval()
 
-    augmentations = src.augmentation.create_augmentations(config)
-
     for augmentation_name in config.training.augmentations:
-        augmentation = augmentations[augmentation_name]
+        augmentation = src.augmentation.get_data_augmentation(config, augmentation_name)
         train_dataset = TrainDataset(
             image_folder=os.path.join(
                 config.project_path,
