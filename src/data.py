@@ -97,6 +97,39 @@ class TestDataset(Dataset):  # type: ignore[misc]
         )
 
 
+class TrainDataset(Dataset):  # type: ignore[misc]
+    def __init__(
+        self,
+        image_folder: str,
+        image_size: tuple[int, int] = (400, 400),
+    ) -> None:
+        self.image_size = image_size
+        self.transform = ttransforms.ToTensor()
+
+        self.samples: list[
+            tuple[str, str]
+        ] = []  # List of (class_name, image_path) pairs.
+        for cls in sorted(os.listdir(image_folder)):
+            cls_folder = os.path.join(image_folder, cls)
+            if not os.path.isdir(cls_folder):
+                continue
+            for root, _, files in os.walk(cls_folder):
+                for file in files:
+                    if file.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif")):
+                        path = os.path.join(root, file)
+                        self.samples.append((cls, path))
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> tuple[str, Image.Image]:
+        cls_name, image_path = self.samples[idx]
+        image = Image.open(image_path)
+        image = image.resize(self.image_size)
+        image = self.transform(image)
+        return image, cls_name
+
+
 def load(
     config: DictConfig,
 ) -> tuple[
