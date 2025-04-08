@@ -28,7 +28,7 @@ class Evaluator:
         Returns:
             Dict[str, float]: Dictionary containing evaluation metrics
         """
-        y_pred_top = self._get_top_k_predictions(y_pred, k=1)
+        y_pred_top = self._get_top_k_predictions(y_pred, k=1).squeeze()
         return {
             "precision": precision_score(
                 y_true, y_pred_top, average="macro", zero_division=0
