@@ -122,7 +122,7 @@ class TrainDataset(Dataset):  # type: ignore[misc]
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> tuple[str, Image.Image]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, str]:
         cls_name, image_path = self.samples[idx]
         image = Image.open(image_path)
         image = image.resize(self.image_size)
