@@ -10,6 +10,7 @@ dependencies = [
     "matplotlib>=3.10.1",
     "numpy>=2.2.4",
     "pandas>=2.2.3",
+    "scikit-learn>=1.6.1",
     "timm>=1.0.15",
     "torch>=2.6.0",
     "torchvision>=0.21.0",
@@ -23,4 +24,8 @@ dev = [
     "kaggle>=1.7.4.2",
     "pre-commit>=4.1.0",
     "pytest>=8.3.5",
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "."
 ]

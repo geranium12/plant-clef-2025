@@ -53,11 +53,14 @@ repos:
         args: [--strict, --ignore-missing-imports]
         exclude: \.ipynb$
         additional_dependencies: [types-pyyaml, hydra-core, wandb]
-  - repo: local
+
+-   repo: local
     hooks:
-      - id: pytest-check
-        name: pytest-check
-        entry: pytest
-        language: system
+    -   id: pytest
+        name: pytest
+        entry: .venv/bin/pytest
+        language: python
+        types: [python]
         pass_filenames: false
         always_run: true
+        files: ^test/
