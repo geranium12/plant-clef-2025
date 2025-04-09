@@ -24,6 +24,7 @@ dev = [
     "kaggle>=1.7.4.2",
     "pre-commit>=4.1.0",
     "pytest>=8.3.5",
+]
 
 [tool.pytest.ini_options]
 pythonpath = [

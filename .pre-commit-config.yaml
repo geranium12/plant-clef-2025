@@ -54,7 +54,7 @@ repos:
         exclude: \.ipynb$
         additional_dependencies: [types-pyyaml, hydra-core, wandb]
 
--   repo: local
+  - repo: local
     hooks:
     -   id: pytest
         name: pytest

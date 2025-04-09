@@ -39,6 +39,8 @@ def train(
     config: DictConfig,
     device: torch.device,
     df_species_ids: pd.DataFrame,
+    train_indices: list[int],
+    val_indices: list[int],
 ) -> tuple[torch.nn.Module, ModelInfo]:
     model = timm.create_model(
         config.models.name,
@@ -61,6 +63,7 @@ def train(
             ),
             image_size=(config.image_width, config.image_height),
             transform=augmentation,
+            indices=train_indices,
         )
 
         fine_tune(config, model, train_dataset)
