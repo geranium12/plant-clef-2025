@@ -2,14 +2,18 @@ import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 
+
 def copy_file(src_file_path: str, dst_file_path: str) -> None:
     if os.path.exists(dst_file_path):
         print(f"File already exists: {dst_file_path}")
     else:
         shutil.copy2(src_file_path, dst_file_path)
 
+
 if __name__ == "__main__":
-    data_dir = "/mnt/storage1/shared_data/plant_clef_2025/data/plant_clef_2024_train_281gb"
+    data_dir = (
+        "/mnt/storage1/shared_data/plant_clef_2025/data/plant_clef_2024_train_281gb"
+    )
     src_dir = os.path.join(data_dir, "val")
     dst_dir = os.path.join(data_dir, "all")
     os.makedirs(dst_dir, exist_ok=True)
