@@ -3,7 +3,7 @@
 #### Hanna
 - [x] Implement evaluation metric (F1 score)
 - [ ] Add 4 heads (organ, genus, family, plant/no plant) to the pre-trained kaggle model (only-classifier-then-all)
-- [ ] Add train to the training pipeline
+- [ ] Add train to the training pipeline and eval
 
 #### Robin
 - [x] Implement data augmentation (tiling, color change, rotation, ...)
