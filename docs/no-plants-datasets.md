@@ -1,7 +1,7 @@
 # No Plants Datasets
 
 #### Rocks
-- https://www.kaggle.com/datasets/neelgajare/rocks-dataset (2385 images, rather good quality) 
+- https://www.kaggle.com/datasets/neelgajare/rocks-dataset (2385 images, rather good quality)
 - https://www.kaggle.com/datasets/stealthtechnologies/rock-classification (4212 images, rather good quality)
 - https://www.kaggle.com/datasets/kutlayusta/type-of-rocks-and-minerals-dataset (10800 images, has more sky/greenery)
 

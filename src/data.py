@@ -20,7 +20,7 @@ class PatchDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
         patches: torch.Tensor,
-        transform: ttransforms.Normalize = None,
+        transform: ttransforms.transforms = None,
     ) -> None:
         self.patches = patches.squeeze(0)
         self.transform = transform
@@ -95,6 +95,40 @@ class TestDataset(Dataset):  # type: ignore[misc]
             patches,
             image_path,
         )
+
+
+class TrainDataset(Dataset):  # type: ignore[misc]
+    def __init__(
+        self,
+        image_folder: str,
+        image_size: tuple[int, int] = (400, 400),
+        transform: ttransforms.transforms = None,
+    ) -> None:
+        self.image_size = image_size
+        self.transform = transform if transform is not None else ttransforms.ToTensor()
+
+        self.samples: list[
+            tuple[str, str]
+        ] = []  # List of (class_name, image_path) pairs.
+        for cls in sorted(os.listdir(image_folder)):
+            cls_folder = os.path.join(image_folder, cls)
+            if not os.path.isdir(cls_folder):
+                continue
+            for root, _, files in os.walk(cls_folder):
+                for file in files:
+                    if file.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif")):
+                        path = os.path.join(root, file)
+                        self.samples.append((cls, path))
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, str]:
+        cls_name, image_path = self.samples[idx]
+        image = Image.open(image_path)
+        image = image.resize(self.image_size)
+        image = self.transform(image)
+        return image, cls_name
 
 
 def load(
