@@ -7,7 +7,6 @@
 
 #### Soil
 - https://www.kaggle.com/datasets/prasanshasatpathy/soil-types (156 images, one can manually filter them)
-- https://www.kaggle.com/datasets/shuvokumarbasak2030/soil-environment-analysis-dataset (4947 images, has more sky/greenery)
 - https://www.kaggle.com/datasets/jhislainematchouath/soil-types-dataset (1555 images, has more sky/greenery)
 
 No really good datasets for other material objects on Kaggle.
