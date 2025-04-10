@@ -38,6 +38,8 @@ training:
   batch_size: 32
   shuffle: false
   num_workers: 1
+  min_score: 0.1
+  top_k_tile: 2
 
 image_width: 400
 image_height: 400

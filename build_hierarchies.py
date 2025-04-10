@@ -93,7 +93,25 @@ def read_plant_taxonomy(config: DictConfig) -> Tree:
     return plant_tree
 
 
-def print_organ_distribution(df_metadata: pd.DataFrame) -> None:
+def get_taxonomy_from_species(plant_tree: Tree, species: str) -> tuple[str, str]:
+    # Find the species node
+    species_node = plant_tree.get_node(species)
+    if species_node is None:
+        raise ValueError(f"Species '{species}' not found in taxonomy tree")
+
+    # Get the parent (genus) and grandparent (family) nodes
+    genus_node = plant_tree.parent(species)
+    if genus_node is None:
+        raise ValueError(f"Genus not found for species '{species}'")
+
+    family_node = plant_tree.parent(genus_node.identifier)
+    if family_node is None:
+        raise ValueError(f"Family not found for species '{species}'")
+
+    return genus_node.identifier, family_node.identifier
+
+
+def get_organ_number(df_metadata: pd.DataFrame) -> int:
     # Check if any species has multiple organs
     species_organs = df_metadata.groupby("species")["organ"].nunique()
     organ_counts = species_organs.value_counts().sort_index()
@@ -103,6 +121,28 @@ def print_organ_distribution(df_metadata: pd.DataFrame) -> None:
         print(
             f"  - {count} species have {num_organs} organ{'s' if num_organs > 1 else ''}"
         )
+
+    return len(organ_counts)
+
+
+def get_plant_tree_number(plant_tree: Tree) -> tuple[int, int, int]:
+    # Get all nodes at each level
+    species_nodes = [
+        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 2
+    ]
+    genus_nodes = [
+        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 1
+    ]
+    family_nodes = [
+        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 0
+    ]
+
+    print("\nTaxonomy statistics:")
+    print(f"  - Number of species: {len(species_nodes)}")
+    print(f"  - Number of genera: {len(genus_nodes)}")
+    print(f"  - Number of families: {len(family_nodes)}")
+
+    return len(species_nodes), len(genus_nodes), len(family_nodes)
 
 
 # organ -> species
@@ -177,7 +217,7 @@ def main(
     df_metadata, _, _ = data.load(config)
 
     # Print how many organs has each species in the training dataset
-    print_organ_distribution(df_metadata)
+    get_organ_number(df_metadata)
 
     build_plant_taxonomy(config, df_metadata)
 
