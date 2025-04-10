@@ -6,18 +6,20 @@ from omegaconf import (
     DictConfig,
     OmegaConf,
 )
-from torch.utils.data import (
-    DataLoader,
-)
+from torch.utils.data import DataLoader
 
 import src.data as data
-import src.prediction as prediction
-import src.submission as submission
 import src.training as training
 import wandb
-from src.data import (
-    TestDataset,
+from build_hierarchies import (
+    get_organ_number,
+    get_plant_tree_number,
+    read_organ_hierarchy,
+    read_plant_taxonomy,
 )
+from src import prediction, submission
+from src.utils import load_model
+from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 
 
 def pipeline(
@@ -30,18 +32,30 @@ def pipeline(
         class_map,
     ) = data.load(config)
 
+    plant_tree = read_plant_taxonomy(config)
+    num_labels_species, num_labels_genus, num_labels_family = get_plant_tree_number(
+        plant_tree
+    )
+    organ_distribution = read_organ_hierarchy(config)
+
+    model = load_model(config=config, device=device, df_species_ids=df_species_ids)
+    print(model)
+    model = ViTMultiHeadClassifier(
+        backbone=model,
+        num_labels_organ=get_organ_number(df_metadata),
+        num_labels_genus=num_labels_genus,
+        num_labels_family=num_labels_family,
+        num_labels_plant=2,
+    )
+    exit()
     model, model_info = training.train(
+        model=model,
         config=config,
         device=device,
-        df_species_ids=df_species_ids,
     )
 
-    batch_size = 64
-    min_score = 0.1
-    top_k_tile = 2
-
-    dataloader = DataLoader(
-        dataset=TestDataset(
+    test_dataloader = DataLoader(
+        dataset=data.TestDataset(
             image_folder=os.path.join(
                 config.project_path,
                 config.data.folder,
@@ -52,20 +66,20 @@ def pipeline(
             stride=int(model_info.input_size / 2),
             use_pad=True,
         ),
-        batch_size=1,
-        num_workers=4,
+        batch_size=config.training.batch_size,
+        num_workers=config.training.num_workers,
         pin_memory=True,
     )
 
     image_predictions = prediction.predict(
-        dataloader=dataloader,
+        dataloader=test_dataloader,
         model=model,
         model_info=model_info,
-        batch_size=batch_size,
+        batch_size=config.training.batch_size,
         device=device,
-        top_k_tile=top_k_tile,
+        top_k_tile=config.training.top_k_tile,
         class_map=class_map,
-        min_score=min_score,
+        min_score=config.training.min_score,
     )
 
     submission.submit(
