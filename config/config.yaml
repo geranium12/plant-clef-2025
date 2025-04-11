@@ -20,6 +20,8 @@ data:
     folder: "utils/"
     plant_taxonomy_file: "plant_taxonomy.json"
     organ_hierarchy_file: "organ_hierarchy.csv"
+  other:
+    folder: "other/"
 
 models:
   name: "vit_base_patch14_reg4_dinov2.lvd142m"

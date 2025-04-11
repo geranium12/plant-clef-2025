@@ -30,14 +30,18 @@ def pipeline(
         class_map,
     ) = data.load(config)
 
-    train_indices, val_indices, test_indices = [None] * 3 if config.training.use_all_data else data.get_data_split(
-        os.path.join(
-            config.project_path,
-            config.data.folder,
-            config.data.train_folder,
-        ),
-        config.training.val_size,
-        config.training.test_size,
+    train_indices, val_indices, test_indices = (
+        [None] * 3
+        if config.training.use_all_data
+        else data.get_data_split(
+            os.path.join(
+                config.project_path,
+                config.data.folder,
+                config.data.train_folder,
+            ),
+            config.training.val_size,
+            config.training.test_size,
+        )
     )
 
     model, model_info = training.train(

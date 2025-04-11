@@ -125,6 +125,24 @@ def get_samples(image_folder: str) -> list[ImageSampleInfo]:
     return samples
 
 
+def get_image_paths(image_folder: str) -> list[str]:
+    """Walks the directory tree and returns a list of all image paths.
+
+    Args:
+        image_folder (str): The folder to walk
+
+    Returns:
+        list[str]: A list of image paths.
+    """
+    valid_extensions = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
+    image_paths: list[str] = []
+    for root, _, files in os.walk(image_folder):
+        for file in files:
+            if file.lower().endswith(valid_extensions):
+                image_paths.append(os.path.join(root, file))
+    return image_paths
+
+
 class TrainDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
@@ -152,6 +170,35 @@ class TrainDataset(Dataset):  # type: ignore[misc]
         image = image.resize(self.image_size)
         image = self.transform(image)
         return image, cls_name
+
+
+class UnlabeledDataset(Dataset):  # type: ignore[misc]
+    def __init__(
+        self,
+        image_folder: str,
+        image_size: tuple[int, int] = (400, 400),
+        transform: ttransforms.transforms = None,
+        indices: Optional[list[int]] = None,
+    ) -> None:
+        self.image_size = image_size
+        self.transform = transform if transform is not None else ttransforms.ToTensor()
+
+        self.samples = get_image_paths(image_folder)
+        if indices is not None:
+            assert all(i < len(self.samples) for i in indices), (
+                "All indices must be less than the number of samples."
+            )
+            self.samples = [self.samples[i] for i in indices if i < len(self.samples)]
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> torch.Tensor:
+        image_path = self.samples[idx]
+        image = Image.open(image_path)
+        image = image.resize(self.image_size)
+        image = self.transform(image)
+        return image
 
 
 def get_data_split(
@@ -215,7 +262,9 @@ def load(
     pd.DataFrame,
     dict[int, int],
 ]:
-    metadata_path = os.path.join(config.project_path, config.data.folder, config.data.metadata.folder)
+    metadata_path = os.path.join(
+        config.project_path, config.data.folder, config.data.metadata.folder
+    )
 
     df_metadata = pd.read_csv(
         os.path.join(metadata_path, config.data.metadata.training),
@@ -223,7 +272,9 @@ def load(
         dtype={"partner": str},
     )
 
-    df_species_ids = pd.read_csv(os.path.join(metadata_path, config.data.metadata.labels))
+    df_species_ids = pd.read_csv(
+        os.path.join(metadata_path, config.data.metadata.labels)
+    )
 
     class_map = df_species_ids[
         "species_id"
