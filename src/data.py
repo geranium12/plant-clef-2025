@@ -1,7 +1,8 @@
+import math
 import os
 import random
 from dataclasses import astuple, dataclass
-from typing import Optional
+from typing import Any, Optional
 
 import pandas as pd
 import torch
@@ -18,6 +19,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import (
     Dataset,
 )
+from tqdm import tqdm
 
 
 class PatchDataset(Dataset):  # type: ignore[misc]
@@ -208,6 +210,23 @@ def get_data_split(
     return train_indices, val_indices, test_indices
 
 
+def read_csv_in_chunks(path: str, n_lines: int, **read_params: Any) -> pd.DataFrame:
+    if "chunksize" not in read_params or read_params["chunksize"] < 1:
+        read_params["chunksize"] = 10000
+    chunks = [0] * math.ceil(n_lines / read_params["chunksize"])
+    for i, chunk in enumerate(
+        tqdm(
+            pd.read_csv(path, **read_params),
+            total=math.ceil(n_lines / read_params["chunksize"]),
+            desc="Reading CSV",
+        )
+    ):
+        chunks[i] = chunk
+    concat_df = pd.concat(chunks, axis=0)
+    del chunks
+    return concat_df
+
+
 def load(
     config: DictConfig,
 ) -> tuple[
@@ -215,15 +234,20 @@ def load(
     pd.DataFrame,
     dict[int, int],
 ]:
-    metadata_path = os.path.join(config.project_path, config.data.folder, config.data.metadata.folder)
+    metadata_path = os.path.join(
+        config.project_path, config.data.folder, config.data.metadata.folder
+    )
 
-    df_metadata = pd.read_csv(
-        os.path.join(metadata_path, config.data.metadata.training),
+    df_metadata = read_csv_in_chunks(
+        path=os.path.join(metadata_path, config.data.metadata.training),
+        n_lines=1408034,
         sep=";",
         dtype={"partner": str},
     )
 
-    df_species_ids = pd.read_csv(os.path.join(metadata_path, config.data.metadata.labels))
+    df_species_ids = pd.read_csv(
+        os.path.join(metadata_path, config.data.metadata.labels)
+    )
 
     class_map = df_species_ids[
         "species_id"
