@@ -215,17 +215,15 @@ def load(
     pd.DataFrame,
     dict[int, int],
 ]:
-    test_data_path = os.path.join(
-        config.project_path, config.data.folder, config.data.test_folder
-    )
+    metadata_path = os.path.join(config.project_path, config.data.folder, config.data.metadata.folder)
 
     df_metadata = pd.read_csv(
-        os.path.join(test_data_path, config.data.metadata_file),
+        os.path.join(metadata_path, config.data.metadata.training),
         sep=";",
         dtype={"partner": str},
     )
 
-    df_species_ids = pd.read_csv(os.path.join(test_data_path, config.data.species_file))
+    df_species_ids = pd.read_csv(os.path.join(metadata_path, config.data.metadata.labels))
 
     class_map = df_species_ids[
         "species_id"

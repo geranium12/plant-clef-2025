@@ -7,9 +7,13 @@ project_path: "/mnt/storage1/shared_data/plant_clef_2025/"
 
 data:
   folder: "data/"
-  metadata_file: "PlantCLEF2024_single_plant_training_metadata.csv"
-  species_file: "species_ids.csv"
-  train_folder: "plant_clef_2024_train_281gb/all/"
+  metadata:
+    folder: "metadata/"
+    training: "PlantCLEF2024_single_plant_training_metadata.csv"
+    test: "PlantCLEF2025_test.csv"
+    no_label: "pseudoquadrats_without_labels_complementary_training_set_urls.csv"
+    labels: "species_ids.csv"
+  train_folder: "plant_clef_train_281gb/"
   test_folder: "plant_clef_2025_test/"
   test_images_folder: "PlantCLEF2025_test_images/PlantCLEF2025_test_images/"
   utils:

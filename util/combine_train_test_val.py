@@ -11,11 +11,8 @@ def copy_file(src_file_path: str, dst_file_path: str) -> None:
 
 
 if __name__ == "__main__":
-    data_dir = (
-        "/mnt/storage1/shared_data/plant_clef_2025/data/plant_clef_2024_train_281gb"
-    )
-    src_dir = os.path.join(data_dir, "val")
-    dst_dir = os.path.join(data_dir, "all")
+    src_dir = None
+    dst_dir = None
     os.makedirs(dst_dir, exist_ok=True)
 
     print(f"Copying files from {src_dir} to {dst_dir}...")

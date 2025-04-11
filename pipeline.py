@@ -58,7 +58,6 @@ def pipeline(
                 config.project_path,
                 config.data.folder,
                 config.data.test_folder,
-                config.data.test_images_folder,
             ),
             patch_size=model_info.input_size,
             stride=int(model_info.input_size / 2),
