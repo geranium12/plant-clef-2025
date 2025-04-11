@@ -32,6 +32,34 @@ def pipeline(
         class_map,
     ) = data.load(config)
 
+    train_indices, val_indices, test_indices = (
+        [None] * 3
+        if config.training.use_all_data
+        else data.get_data_split(
+            os.path.join(
+                config.project_path,
+                config.data.folder,
+                config.data.train_folder,
+            ),
+            config.training.val_size,
+            config.training.test_size,
+        )
+    )
+
+    train_indices, val_indices, test_indices = (
+        [None] * 3
+        if config.training.use_all_data
+        else data.get_data_split(
+            os.path.join(
+                config.project_path,
+                config.data.folder,
+                config.data.train_folder,
+            ),
+            config.training.val_size,
+            config.training.test_size,
+        )
+    )
+
     plant_tree = read_plant_taxonomy(config)
     num_labels_species, num_labels_genus, num_labels_family = get_plant_tree_number(
         plant_tree
@@ -52,6 +80,9 @@ def pipeline(
         model=model,
         config=config,
         device=device,
+        df_species_ids=df_species_ids,
+        train_indices=train_indices,
+        val_indices=val_indices,
     )
 
     test_dataloader = DataLoader(
@@ -60,7 +91,6 @@ def pipeline(
                 config.project_path,
                 config.data.folder,
                 config.data.test_folder,
-                config.data.test_images_folder,
             ),
             patch_size=model_info.input_size,
             stride=int(model_info.input_size / 2),

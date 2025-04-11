@@ -10,6 +10,7 @@ import torch.optim as optim
 from omegaconf import (
     DictConfig,
 )
+from pandas import pd
 from torch.utils.data import DataLoader
 
 import src.augmentation
@@ -28,8 +29,21 @@ def train(
     model: nn.Module,
     config: DictConfig,
     device: torch.device,
+    df_species_ids: pd.DataFrame,
+    train_indices: list[int],
+    val_indices: list[int],
 ) -> tuple[torch.nn.Module, ModelInfo, float]:
     plant_tree = read_plant_taxonomy(config)
+    model = timm.create_model(
+        config.models.name,
+        pretrained=config.models.pretrained,
+        num_classes=len(df_species_ids),
+        checkpoint_path=os.path.join(
+            config.project_path, config.models.folder, config.models.checkpoint_file
+        ),
+    )
+    model = model.to(device)
+    model = model.eval()
 
     for augmentation_name in config.training.augmentations:
         augmentation = src.augmentation.get_data_augmentation(config, augmentation_name)
@@ -42,6 +56,7 @@ def train(
             ),
             image_size=(config.image_width, config.image_height),
             transform=augmentation,
+            indices=train_indices,
         )
 
         train_dataloader = DataLoader(
