@@ -1,5 +1,5 @@
-import json
 import os
+import pickle
 
 import hydra
 import pandas as pd
@@ -53,11 +53,7 @@ def build_plant_taxonomy(
     for node in plant_tree.all_nodes()[:10]:  # Show first 10 nodes
         print(f"{'  ' * plant_tree.depth(node)}- {node.tag}")
 
-    # Convert the tree to a dictionary and then to JSON
-    tree_dict = plant_tree.to_dict(with_data=True)
-    json_string = json.dumps(tree_dict, indent=4)
-
-    # Save the JSON string to a file
+    # Save the tree as a Pickle file
     folder_path = os.path.join(
         config.project_path,
         config.data.folder,
@@ -67,14 +63,11 @@ def build_plant_taxonomy(
         folder_path,
         exist_ok=True,
     )
+
     with open(
-        os.path.join(
-            folder_path,
-            config.data.utils.plant_taxonomy_file,
-        ),
-        "w",
-    ) as json_file:
-        json_file.write(json_string)
+        os.path.join(folder_path, config.data.utils.plant_taxonomy_file), "wb"
+    ) as file:
+        pickle.dump(plant_tree, file)
 
 
 def read_plant_taxonomy(config: DictConfig) -> Tree:
@@ -85,12 +78,9 @@ def read_plant_taxonomy(config: DictConfig) -> Tree:
             config.data.utils.folder,
             config.data.utils.plant_taxonomy_file,
         ),
-    ) as json_file:
-        tree_dict = json.load(json_file)
-
-    plant_tree = Tree()
-    plant_tree.from_dict(tree_dict)
-    return plant_tree
+        "rb",
+    ) as file:
+        return pickle.load(file)
 
 
 def get_taxonomy_from_species(plant_tree: Tree, species: str) -> tuple[str, str]:
@@ -128,13 +118,13 @@ def get_organ_number(df_metadata: pd.DataFrame) -> int:
 def get_plant_tree_number(plant_tree: Tree) -> tuple[int, int, int]:
     # Get all nodes at each level
     species_nodes = [
-        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 2
+        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 3
     ]
     genus_nodes = [
-        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 1
+        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 2
     ]
     family_nodes = [
-        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 0
+        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 1
     ]
 
     print("\nTaxonomy statistics:")
