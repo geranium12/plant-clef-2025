@@ -13,7 +13,7 @@ from omegaconf import (
 from torch.utils.data import DataLoader, Dataset
 
 import src.augmentation
-from src.data import TrainDataset, UnlabeledDataset
+from src.data import ConcatenatedDataset, DataSplit, TrainDataset, UnlabeledDataset
 
 
 def fine_tune(config: DictConfig, model: torch.nn.Module, dataset: Dataset) -> None:
@@ -40,8 +40,8 @@ def train(
     config: DictConfig,
     device: torch.device,
     df_species_ids: pd.DataFrame,
-    train_indices: Optional[list[int]],
-    val_indices: Optional[list[int]],  # TODO: Use val_indices
+    labeled_data_split: Optional[DataSplit] = None,
+    unlabeled_data_split: Optional[DataSplit] = None,
 ) -> tuple[torch.nn.Module, ModelInfo]:
     model = timm.create_model(
         config.models.name,
@@ -56,30 +56,36 @@ def train(
 
     for augmentation_name in config.training.augmentations:
         augmentation = src.augmentation.get_data_augmentation(config, augmentation_name)
-        train_dataset = TrainDataset(
-            image_folder=os.path.join(
-                config.project_path,
-                config.data.folder,
-                config.data.train_folder,
-            ),
-            image_size=(config.image_width, config.image_height),
-            transform=augmentation,
-            indices=train_indices,
+        train_dataset = ConcatenatedDataset(
+            [
+                TrainDataset(
+                    image_folder=os.path.join(
+                        config.project_path,
+                        config.data.folder,
+                        config.data.train_folder,
+                    ),
+                    image_size=(config.image_width, config.image_height),
+                    transform=augmentation,
+                    indices=(
+                        labeled_data_split.train_indices if labeled_data_split else None
+                    ),
+                ),
+                UnlabeledDataset(
+                    image_folder=os.path.join(
+                        config.project_path,
+                        config.data.folder,
+                        config.data.other.folder,
+                    ),
+                    image_size=(config.image_width, config.image_height),
+                    transform=augmentation,
+                    indices=unlabeled_data_split.train_indices
+                    if unlabeled_data_split
+                    else None,
+                ),
+            ]
         )
 
         fine_tune(config, model, train_dataset)
-
-    for augmentation_name in config.training.augmentations:
-        augmentation = src.augmentation.get_data_augmentation(config, augmentation_name)
-        train_dataset = UnlabeledDataset(
-            image_folder=os.path.join(
-                config.project_path, config.data.folder, config.data.other.folder
-            ),
-            image_size=(config.image_width, config.image_height),
-            transform=augmentation,
-            indices=None,
-        )
-        # TODO: Use unlabeled rock/soil data to fine-tune the model
 
     data_config = timm.data.resolve_model_data_config(model)
     model_info = ModelInfo(
