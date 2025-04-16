@@ -2,14 +2,17 @@
 
 #### Hanna
 - [x] Implement evaluation metric (F1 score)
-- [ ] Add 4 heads (organ, genus, family, plant/no plant) to the pre-trained kaggle model (only-classifier-then-all)
-- [ ] Add train to the training pipeline and eval
+- [x] Add 4 heads (organ, genus, family, plant/no plant) to the pre-trained kaggle model (only-classifier-then-all)
+- [x] Add train to the pipeline
+- [ ] Add eval to the pipeline
+- [ ] Reweigh loss
+- [ ] Add one augmentation that is a pipe of many random ones
 
 #### Robin
 - [x] Implement data augmentation (tiling, color change, rotation, ...)
-- [ ] Resplit the training data
+- [x] Resplit the training data
 - [ ] Integrate the LUCAS no labels dataset
-- [ ] Add non-plant datasets (download + to the code)
+- [x] Add non-plant datasets (download + to the code)
 
 #### Tomo
 
