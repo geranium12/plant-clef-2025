@@ -14,7 +14,6 @@ import wandb
 from build_hierarchies import (
     get_organ_number,
     get_plant_tree_number,
-    read_organ_hierarchy,
     read_plant_taxonomy,
 )
 from src import prediction, submission
@@ -61,26 +60,24 @@ def pipeline(
     )
 
     plant_tree = read_plant_taxonomy(config)
-    num_labels_species, num_labels_genus, num_labels_family = get_plant_tree_number(
-        plant_tree
-    )
-    organ_distribution = read_organ_hierarchy(config)
+    _, num_labels_genus, num_labels_family = get_plant_tree_number(plant_tree)
 
     model = load_model(config=config, device=device, df_species_ids=df_species_ids)
-    print(model)
     model = ViTMultiHeadClassifier(
         backbone=model,
         num_labels_organ=get_organ_number(df_metadata),
         num_labels_genus=num_labels_genus,
         num_labels_family=num_labels_family,
-        num_labels_plant=2,
+        num_labels_plant=1,
     )
-    exit()
+    print(model)
+
     model, model_info = training.train(
         model=model,
         config=config,
         device=device,
         df_species_ids=df_species_ids,
+        df_metadata=df_metadata,
         train_indices=train_indices,
         val_indices=val_indices,
     )
@@ -133,7 +130,7 @@ def main(
         reinit=False if config is None else True,
     )
 
-    device = torch.device("cuda")
+    device = torch.device("cuda:3")
 
     pipeline(config, device)
 

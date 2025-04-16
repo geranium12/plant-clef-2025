@@ -148,12 +148,14 @@ class TrainDataset(Dataset):  # type: ignore[misc]
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, str]:
-        cls_name, image_path = self.samples[idx]
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int, str, float]:
+        species_id, image_path = self.samples[idx]
+        species_id = int(species_id)
         image = Image.open(image_path)
         image = image.resize(self.image_size)
         image = self.transform(image)
-        return image, cls_name
+        image_name = os.path.basename(image_path)
+        return (image, species_id, image_name, 1.0)
 
 
 def get_data_split(

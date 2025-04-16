@@ -3,6 +3,7 @@ from dataclasses import (
     dataclass,
 )
 
+import pandas as pd
 import timm
 import torch
 import torch.nn as nn
@@ -10,12 +11,25 @@ import torch.optim as optim
 from omegaconf import (
     DictConfig,
 )
-from pandas import pd
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 import src.augmentation
-from build_hierarchies import get_taxonomy_from_species, read_plant_taxonomy
+import wandb
+from build_hierarchies import (
+    check_utils_folder,
+    get_taxonomy_from_species,
+    read_plant_taxonomy,
+)
 from src.data import TrainDataset
+from src.utils import (
+    family_name_to_id,
+    genus_name_to_id,
+    image_path_to_organ_name,
+    organ_name_to_id,
+    species_id_to_name,
+    species_name_to_new_id,
+)
 
 
 @dataclass
@@ -30,20 +44,31 @@ def train(
     config: DictConfig,
     device: torch.device,
     df_species_ids: pd.DataFrame,
-    train_indices: list[int],
-    val_indices: list[int],
-) -> tuple[torch.nn.Module, ModelInfo, float]:
+    df_metadata: pd.DataFrame,
+    train_indices: list[int] | None,
+    val_indices: list[int] | None,
+) -> tuple[torch.nn.Module, ModelInfo]:
     plant_tree = read_plant_taxonomy(config)
-    model = timm.create_model(
-        config.models.name,
-        pretrained=config.models.pretrained,
-        num_classes=len(df_species_ids),
-        checkpoint_path=os.path.join(
-            config.project_path, config.models.folder, config.models.checkpoint_file
-        ),
+    folder_name = check_utils_folder(config)
+    species_mapping = pd.read_csv(
+        os.path.join(folder_name, config.data.utils.species_mapping)
     )
-    model = model.to(device)
-    model = model.eval()
+    genus_mapping = pd.read_csv(
+        os.path.join(folder_name, config.data.utils.genus_mapping)
+    )
+    family_mapping = pd.read_csv(
+        os.path.join(folder_name, config.data.utils.family_mapping)
+    )
+    organ_mapping = pd.read_csv(
+        os.path.join(folder_name, config.data.utils.organ_mapping)
+    )
+
+    model.to(device)
+    model.train()
+
+    optimizer = optim.Adam(
+        filter(lambda p: p.requires_grad, model.parameters()), lr=config.training.lr
+    )
 
     for augmentation_name in config.training.augmentations:
         augmentation = src.augmentation.get_data_augmentation(config, augmentation_name)
@@ -64,41 +89,89 @@ def train(
             batch_size=config.training.batch_size,
             shuffle=config.training.shuffle,
             num_workers=config.training.num_workers,
+            pin_memory=True,
         )
 
-        model.to(device)
-
-        optimizer = optim.Adam(
-            filter(lambda p: p.requires_grad, model.parameters()), lr=config.training.lr
-        )
-
-        model.train()
         for epoch in range(config.training.epochs):
             running_loss = 0.0
-            for batch in train_dataloader:
-                image, species_labels = batch["image"].to(device)
+            for iteration, batch in tqdm(
+                enumerate(train_dataloader),
+                desc="Training",
+                total=len(train_dataloader),
+            ):
+                images, species_labels, images_names, plant_labels = batch
+                images = images.to(device)
+                species_labels = species_labels.to(device)
+                plant_labels = plant_labels.to(device)
                 labels = {}
-                labels["species"] = species_labels
+                labels["plant"] = plant_labels
 
+                new_species_labels = []
                 genus_labels = []
                 family_labels = []
-                for species in species_labels:
-                    genus, family = get_taxonomy_from_species(plant_tree, species)
-                    genus_labels.append(genus)
-                    family_labels.append(family)
+                for species_id in species_labels:
+                    species_name = species_id_to_name(
+                        species_id.item(), species_mapping
+                    )
+                    genus_name, family_name = get_taxonomy_from_species(
+                        plant_tree, species_name
+                    )
+                    new_species_id = species_name_to_new_id(
+                        species_name, species_mapping
+                    )
+                    genus_id = genus_name_to_id(genus_name, genus_mapping)
+                    family_id = family_name_to_id(family_name, family_mapping)
+                    new_species_labels.append(new_species_id)
+                    genus_labels.append(genus_id)
+                    family_labels.append(family_id)
 
-                genus_labels = torch.Tensor(genus_labels).to(device)
-                family_labels = torch.Tensor(family_labels).to(device)
+                new_species_labels = torch.tensor(new_species_labels).to(device)
+                genus_labels = torch.tensor(genus_labels).to(device)
+                family_labels = torch.tensor(family_labels).to(device)
                 labels["genus"] = genus_labels
                 labels["family"] = family_labels
+                labels["species"] = new_species_labels
+
+                organ_labels = []
+                for image_name in images_names:
+                    organ_name = image_path_to_organ_name(image_name, df_metadata)
+                    organ_id = organ_name_to_id(organ_name, organ_mapping)
+                    organ_labels.append(organ_id)
+                organ_labels = torch.tensor(organ_labels).to(device)
+                labels["organ"] = organ_labels
 
                 optimizer.zero_grad()
-                outputs = model(image, labels=labels)
+                outputs = model(pixel_values=images, labels=labels)
                 loss = outputs["loss"]
                 loss.backward()
                 optimizer.step()
 
                 running_loss += loss.item()
+
+                loss_species = outputs["loss_species"]
+                loss_genus = outputs["loss_genus"]
+                loss_family = outputs["loss_family"]
+                loss_plant = outputs["loss_plant"]
+                loss_organ = outputs["loss_organ"]
+
+                wandb.log(
+                    {
+                        "loss": loss.item(),
+                        "epoch": epoch,
+                        "iter": iteration,
+                        "loss_species": loss_species.item(),
+                        "loss_genus": loss_genus.item(),
+                        "loss_family": loss_family.item(),
+                        "loss_plant": loss_plant.item(),
+                        "loss_organ": loss_organ.item(),
+                    }
+                )
+
+                print(
+                    f"Iter: {iteration}, Loss: {loss.item():.4f}, Loss Species: {loss_species.item():.4f}, "
+                    f"Loss Genus: {loss_genus.item():.4f}, Loss Family: {loss_family.item():.4f}, "
+                    f"Loss Plant: {loss_plant.item():.4f}, Loss Organ: {loss_organ.item():.4f}"
+                )
 
             avg_loss = running_loss / len(train_dataloader)
             print(f"Epoch [{epoch + 1}/{config.training.epochs}], Loss: {avg_loss:.4f}")
@@ -110,4 +183,4 @@ def train(
         data_config["std"],
     )
 
-    return model, model_info, avg_loss
+    return model, model_info
