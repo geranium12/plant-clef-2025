@@ -3,6 +3,7 @@ import random
 from dataclasses import astuple, dataclass
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 import torch
 import torchvision.transforms as ttransforms
@@ -125,6 +126,24 @@ def get_samples(image_folder: str) -> list[ImageSampleInfo]:
     return samples
 
 
+def get_image_paths(image_folder: str) -> list[str]:
+    """Walks the directory tree and returns a list of all image paths.
+
+    Args:
+        image_folder (str): The folder to walk
+
+    Returns:
+        list[str]: A list of image paths.
+    """
+    valid_extensions = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
+    image_paths: list[str] = []
+    for root, _, files in os.walk(image_folder):
+        for file in files:
+            if file.lower().endswith(valid_extensions):
+                image_paths.append(os.path.join(root, file))
+    return image_paths
+
+
 class TrainDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
@@ -154,16 +173,111 @@ class TrainDataset(Dataset):  # type: ignore[misc]
         return image, cls_name
 
 
-def get_data_split(
+class UnlabeledDataset(Dataset):  # type: ignore[misc]
+    def __init__(
+        self,
+        image_folder: str,
+        image_size: tuple[int, int] = (400, 400),
+        transform: ttransforms.transforms = None,
+        indices: Optional[list[int]] = None,
+    ) -> None:
+        self.image_size = image_size
+        self.transform = transform if transform is not None else ttransforms.ToTensor()
+
+        self.samples = get_image_paths(image_folder)
+        if indices is not None:
+            assert all(i < len(self.samples) for i in indices), (
+                "All indices must be less than the number of samples."
+            )
+            self.samples = [self.samples[i] for i in indices if i < len(self.samples)]
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, None]:
+        image_path = self.samples[idx]
+        image = Image.open(image_path)
+        image = image.resize(self.image_size)
+        image = self.transform(image)
+        return image, None
+
+
+class ConcatenatedDataset(Dataset):  # type: ignore[misc]
+    def __init__(
+        self,
+        datasets: list[Dataset],
+    ) -> None:
+        self.datasets = datasets
+        self.end_indices = np.cumsum([len(dataset) for dataset in datasets])
+
+    def __len__(self) -> int:
+        return int(self.end_indices[-1])
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, Optional[str]]:
+        idx = (idx % len(self) + len(self)) % len(self)
+        for i, end_idx in enumerate(self.end_indices):
+            if idx < end_idx:
+                dataset = self.datasets[i]
+                dataset_idx = idx if i == 0 else idx - self.end_indices[i - 1]
+                return dataset[dataset_idx]  # type: ignore[no-any-return]
+        raise IndexError("Index out of range")
+
+
+@dataclass
+class DataSplit:
+    train_indices: list[int]
+    val_indices: list[int]
+    test_indices: list[int]
+
+    def __iter__(self):  # type: ignore[no-untyped-def]
+        return iter(astuple(self))
+
+
+def get_labeled_data_split(
     image_folder: str, val_size: float = 0.2, test_size: float = 0.1
-) -> tuple[list[int], list[int], list[int]]:
+) -> DataSplit:
     """Generates split indices for training, validation, and test sets.
 
     Args:
         image_folder (str): The folder containing the image folders.
 
     Returns:
-        dict[str, list[int]]: A dict with 'train', 'val', and 'test' indices.
+        DataSplit: The train, validation, and test indices.
+    """
+    samples = get_image_paths(image_folder)
+    indices = list(range(len(samples)))
+    assert val_size + test_size < 1.0, (
+        "Validation and test sizes must sum to less than 1.0"
+    )
+
+    train_test_indices, val_indices = train_test_split(
+        indices,
+        test_size=val_size,
+        random_state=42,
+    )
+    train_indices, test_indices = train_test_split(
+        train_test_indices,
+        test_size=test_size / (1.0 - val_size),
+        random_state=42,
+    )
+
+    return DataSplit(
+        train_indices=train_indices,
+        val_indices=val_indices,
+        test_indices=test_indices,
+    )
+
+
+def get_unlabeled_data_split(
+    image_folder: str, val_size: float = 0.2, test_size: float = 0.1
+) -> DataSplit:
+    """Generates split indices for training, validation, and test sets.
+
+    Args:
+        image_folder (str): The folder containing the images.
+
+    Returns:
+        DataSplit: The train, validation, and test indices.
     """
     samples = get_samples(image_folder)
     indices = list(range(len(samples)))
@@ -205,7 +319,11 @@ def get_data_split(
         else:
             train_indices.append(i)
 
-    return train_indices, val_indices, test_indices
+    return DataSplit(
+        train_indices=train_indices,
+        val_indices=val_indices,
+        test_indices=test_indices,
+    )
 
 
 def load(
@@ -215,7 +333,9 @@ def load(
     pd.DataFrame,
     dict[int, int],
 ]:
-    metadata_path = os.path.join(config.project_path, config.data.folder, config.data.metadata.folder)
+    metadata_path = os.path.join(
+        config.project_path, config.data.folder, config.data.metadata.folder
+    )
 
     df_metadata = pd.read_csv(
         os.path.join(metadata_path, config.data.metadata.training),
@@ -223,7 +343,9 @@ def load(
         dtype={"partner": str},
     )
 
-    df_species_ids = pd.read_csv(os.path.join(metadata_path, config.data.metadata.labels))
+    df_species_ids = pd.read_csv(
+        os.path.join(metadata_path, config.data.metadata.labels)
+    )
 
     class_map = df_species_ids[
         "species_id"
