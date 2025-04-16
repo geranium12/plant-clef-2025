@@ -2,6 +2,7 @@ import os
 from dataclasses import (
     dataclass,
 )
+from typing import Optional
 
 import pandas as pd
 import timm
@@ -21,7 +22,7 @@ from build_hierarchies import (
     get_taxonomy_from_species,
     read_plant_taxonomy,
 )
-from src.data import TrainDataset
+from src.data import ConcatenatedDataset, DataSplit, TrainDataset, UnlabeledDataset
 from src.utils import (
     family_name_to_id,
     genus_name_to_id,
@@ -45,8 +46,8 @@ def train(
     device: torch.device,
     df_species_ids: pd.DataFrame,
     df_metadata: pd.DataFrame,
-    train_indices: list[int] | None,
-    val_indices: list[int] | None,
+    labeled_data_split: Optional[DataSplit] = None,
+    unlabeled_data_split: Optional[DataSplit] = None,
 ) -> tuple[torch.nn.Module, ModelInfo]:
     plant_tree = read_plant_taxonomy(config)
     folder_name = check_utils_folder(config)
@@ -72,16 +73,33 @@ def train(
 
     for augmentation_name in config.training.augmentations:
         augmentation = src.augmentation.get_data_augmentation(config, augmentation_name)
-
-        train_dataset = TrainDataset(
-            image_folder=os.path.join(
-                config.project_path,
-                config.data.folder,
-                config.data.train_folder,
-            ),
-            image_size=(config.image_width, config.image_height),
-            transform=augmentation,
-            indices=train_indices,
+        train_dataset = ConcatenatedDataset(
+            [
+                TrainDataset(
+                    image_folder=os.path.join(
+                        config.project_path,
+                        config.data.folder,
+                        config.data.train_folder,
+                    ),
+                    image_size=(config.image_width, config.image_height),
+                    transform=augmentation,
+                    indices=(
+                        labeled_data_split.train_indices if labeled_data_split else None
+                    ),
+                ),
+                UnlabeledDataset(
+                    image_folder=os.path.join(
+                        config.project_path,
+                        config.data.folder,
+                        config.data.other.folder,
+                    ),
+                    image_size=(config.image_width, config.image_height),
+                    transform=augmentation,
+                    indices=unlabeled_data_split.train_indices
+                    if unlabeled_data_split
+                    else None,
+                ),
+            ]
         )
 
         train_dataloader = DataLoader(
@@ -105,43 +123,52 @@ def train(
                 plant_labels = plant_labels.to(device)
                 labels = {}
                 labels["plant"] = plant_labels
+                plant_mask = plant_labels == 1
 
                 new_species_labels = []
                 genus_labels = []
                 family_labels = []
-                for species_id in species_labels:
-                    species_name = species_id_to_name(
-                        species_id.item(), species_mapping
-                    )
-                    genus_name, family_name = get_taxonomy_from_species(
-                        plant_tree, species_name
-                    )
-                    new_species_id = species_name_to_new_id(
-                        species_name, species_mapping
-                    )
-                    genus_id = genus_name_to_id(genus_name, genus_mapping)
-                    family_id = family_name_to_id(family_name, family_mapping)
-                    new_species_labels.append(new_species_id)
-                    genus_labels.append(genus_id)
-                    family_labels.append(family_id)
+                organ_labels = []
+                for i, species_id in enumerate(species_labels):
+                    if species_id is None:
+                        new_species_labels.append(-1)
+                        genus_labels.append(-1)
+                        family_labels.append(-1)
+                        organ_labels.append(-1)
+                    else:
+                        species_name = species_id_to_name(
+                            species_id.item(), species_mapping
+                        )
+                        genus_name, family_name = get_taxonomy_from_species(
+                            plant_tree, species_name
+                        )
+                        new_species_id = species_name_to_new_id(
+                            species_name, species_mapping
+                        )
+                        genus_id = genus_name_to_id(genus_name, genus_mapping)
+                        family_id = family_name_to_id(family_name, family_mapping)
+                        new_species_labels.append(new_species_id)
+                        genus_labels.append(genus_id)
+                        family_labels.append(family_id)
+
+                        image_name = images_names[i]
+                        organ_name = image_path_to_organ_name(image_name, df_metadata)
+                        organ_id = organ_name_to_id(organ_name, organ_mapping)
+                        organ_labels.append(organ_id)
 
                 new_species_labels = torch.tensor(new_species_labels).to(device)
                 genus_labels = torch.tensor(genus_labels).to(device)
                 family_labels = torch.tensor(family_labels).to(device)
+                organ_labels = torch.tensor(organ_labels).to(device)
+                labels["species"] = new_species_labels
                 labels["genus"] = genus_labels
                 labels["family"] = family_labels
-                labels["species"] = new_species_labels
-
-                organ_labels = []
-                for image_name in images_names:
-                    organ_name = image_path_to_organ_name(image_name, df_metadata)
-                    organ_id = organ_name_to_id(organ_name, organ_mapping)
-                    organ_labels.append(organ_id)
-                organ_labels = torch.tensor(organ_labels).to(device)
                 labels["organ"] = organ_labels
 
                 optimizer.zero_grad()
-                outputs = model(pixel_values=images, labels=labels)
+                outputs = model(
+                    pixel_values=images, labels=labels, plant_mask=plant_mask
+                )
                 loss = outputs["loss"]
                 loss.backward()
                 optimizer.step()

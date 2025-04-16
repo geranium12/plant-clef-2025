@@ -56,7 +56,10 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore[misc]
                 param.requires_grad = False
 
     def forward(
-        self, pixel_values: torch.Tensor, labels: torch.Tensor | None = None
+        self,
+        pixel_values: torch.Tensor,
+        labels: torch.Tensor | None = None,
+        plant_mask: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         outputs = self.backbone.forward_features(pixel_values)
         cls_output = outputs[:, 0]  # Get the CLS token embedding (first token)
@@ -69,13 +72,40 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore[misc]
         ce_loss = nn.CrossEntropyLoss()
         bce_loss = nn.BCEWithLogitsLoss()
         if labels is not None:
-            loss_organ = ce_loss(logits_organ, labels["organ"])
-            loss_species = ce_loss(logits_species, labels["species"])
-            loss_genus = ce_loss(logits_genus, labels["genus"])
-            loss_family = ce_loss(logits_family, labels["family"])
+            if plant_mask is not None:
+                loss_species = torch.zeros(
+                    size=plant_mask.shape, dtype=torch.float32, device=cls_output.device
+                )
+                loss_species = ce_loss(
+                    logits_species[plant_mask], labels["species"][plant_mask]
+                )
+                loss_genus = torch.zeros(
+                    size=plant_mask.shape, dtype=torch.float32, device=cls_output.device
+                )
+                loss_genus = ce_loss(
+                    logits_genus[plant_mask], labels["genus"][plant_mask]
+                )
+                loss_family = torch.zeros(
+                    size=plant_mask.shape, dtype=torch.float32, device=cls_output.device
+                )
+                loss_family = ce_loss(
+                    logits_family[plant_mask], labels["family"][plant_mask]
+                )
+                loss_organ = torch.zeros(
+                    size=plant_mask.shape, dtype=torch.float32, device=cls_output.device
+                )
+                loss_organ = ce_loss(
+                    logits_organ[plant_mask], labels["organ"][plant_mask]
+                )
+            else:
+                loss_species = ce_loss(logits_species, labels["species"])
+                loss_genus = ce_loss(logits_genus, labels["genus"])
+                loss_family = ce_loss(logits_family, labels["family"])
+                loss_organ = ce_loss(logits_organ, labels["organ"])
             loss_plant = bce_loss(logits_plant, labels["plant"])
-            # TODO: Do we want weigh losses?
-            loss = loss_organ + loss_genus + loss_family + loss_plant
+
+            # TODO: Add loss weighting
+            loss = loss_species + loss_genus + loss_family + loss_plant + loss_organ
             return {
                 "loss": loss,
                 "loss_organ": loss_organ,

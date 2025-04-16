@@ -11,8 +11,8 @@ def copy_file(src_file_path: str, dst_file_path: str) -> None:
 
 
 if __name__ == "__main__":
-    src_dir = None
-    dst_dir = None
+    src_dir: str = ""
+    dst_dir: str = ""
     os.makedirs(dst_dir, exist_ok=True)
 
     print(f"Copying files from {src_dir} to {dst_dir}...")

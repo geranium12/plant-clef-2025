@@ -31,10 +31,10 @@ def pipeline(
         class_map,
     ) = data.load(config)
 
-    train_indices, val_indices, test_indices = (
-        [None] * 3
+    labeled_data_split = (
+        None
         if config.training.use_all_data
-        else data.get_data_split(
+        else data.get_labeled_data_split(
             os.path.join(
                 config.project_path,
                 config.data.folder,
@@ -44,15 +44,14 @@ def pipeline(
             config.training.test_size,
         )
     )
-
-    train_indices, val_indices, test_indices = (
-        [None] * 3
+    unlabeled_data_split = (
+        None
         if config.training.use_all_data
-        else data.get_data_split(
+        else data.get_unlabeled_data_split(
             os.path.join(
                 config.project_path,
                 config.data.folder,
-                config.data.train_folder,
+                config.data.other.folder,
             ),
             config.training.val_size,
             config.training.test_size,
@@ -78,8 +77,8 @@ def pipeline(
         device=device,
         df_species_ids=df_species_ids,
         df_metadata=df_metadata,
-        train_indices=train_indices,
-        val_indices=val_indices,
+        labeled_data_split=labeled_data_split,
+        unlabeled_data_split=unlabeled_data_split,
     )
 
     test_dataloader = DataLoader(

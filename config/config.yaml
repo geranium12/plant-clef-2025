@@ -24,6 +24,8 @@ data:
     family_mapping: "family_ids.csv"
     organ_mapping: "organ_ids.csv"
     species_mapping: "species_ids.csv"
+  other:
+    folder: "other/"
 
 models:
   name: "vit_base_patch14_reg4_dinov2.lvd142m"
