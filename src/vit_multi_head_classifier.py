@@ -3,42 +3,51 @@ from typing import Any
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F  # noqa
 from transformers import ViTModel
 
 
-class ViTMultiHeadClassifier:
+class ViTMultiHeadClassifier(nn.Module):  # type: ignore[misc]
     def __init__(
         self,
         backbone: Any = ViTModel,
-        # backbone_model_name="google/vit-base-patch16-224",
         num_labels_organ: int = 5,
         num_labels_genus: int = 100,
         num_labels_family: int = 50,
-        num_labels_plant: int = 2,
+        num_labels_plant: int = 1,
         freeze_backbone: bool = True,
     ) -> None:
-        # self.backbone = ViTModel.from_pretrained(backbone_model_name)
+        super().__init__()
+
         self.backbone = deepcopy(backbone)
-        hidden_size = self.backbone.config.hidden_size  # typically 768
+        hidden_size = self.backbone.num_features
+
+        if hasattr(self.backbone, "head"):
+            self.classifier_species = nn.Sequential(
+                nn.Linear(hidden_size, hidden_size),
+                nn.GELU(),
+                deepcopy(self.backbone.head),
+            )
+            self.backbone.head = nn.Identity()
+            self.backbone.head_drop = nn.Identity()
+
         self.classifier_organ = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(hidden_size, num_labels_organ),
         )
         self.classifier_genus = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(hidden_size, num_labels_genus),
         )
         self.classifier_family = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(hidden_size, num_labels_family),
         )
         self.classifier_plant = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(hidden_size, num_labels_plant),
         )
 
@@ -47,31 +56,35 @@ class ViTMultiHeadClassifier:
                 param.requires_grad = False
 
     def forward(
-        self, pixel_values: torch.Tensor, labels: torch.Tensor = None
+        self, pixel_values: torch.Tensor, labels: torch.Tensor | None = None
     ) -> dict[str, torch.Tensor]:
-        # pixel_values: (batch, 3, 224, 224)
-        outputs = self.backbone(pixel_values=pixel_values)
-        # Use the CLS token representation
-        cls_output = outputs.last_hidden_state[:, 0]
+        outputs = self.backbone.forward_features(pixel_values)
+        cls_output = outputs[:, 0]  # Get the CLS token embedding (first token)
         logits_organ = self.classifier_organ(cls_output)
+        logits_species = self.classifier_species(cls_output)
         logits_genus = self.classifier_genus(cls_output)
         logits_family = self.classifier_family(cls_output)
-        logits_plant = self.classifier_plant(cls_output)
+        logits_plant = self.classifier_plant(cls_output).squeeze()
 
+        ce_loss = nn.CrossEntropyLoss()
+        bce_loss = nn.BCEWithLogitsLoss()
         if labels is not None:
-            loss_organ = F.cross_entropy(logits_organ, labels["organ"])
-            loss_genus = F.cross_entropy(logits_genus, labels["genus"])
-            loss_family = F.cross_entropy(logits_family, labels["family"])
-            loss_plant = F.cross_entropy(logits_plant, labels["plant"])
+            loss_organ = ce_loss(logits_organ, labels["organ"])
+            loss_species = ce_loss(logits_species, labels["species"])
+            loss_genus = ce_loss(logits_genus, labels["genus"])
+            loss_family = ce_loss(logits_family, labels["family"])
+            loss_plant = bce_loss(logits_plant, labels["plant"])
             # TODO: Do we want weigh losses?
             loss = loss_organ + loss_genus + loss_family + loss_plant
             return {
                 "loss": loss,
                 "loss_organ": loss_organ,
+                "loss_species": loss_species,
                 "loss_genus": loss_genus,
                 "loss_family": loss_family,
                 "loss_plant": loss_plant,
                 "logits_organ": logits_organ,
+                "logits_species": logits_species,
                 "logits_genus": logits_genus,
                 "logits_family": logits_family,
                 "logits_plant": logits_plant,
@@ -79,7 +92,18 @@ class ViTMultiHeadClassifier:
         else:
             return {
                 "logits_organ": logits_organ,
+                "logits_species": logits_species,
                 "logits_genus": logits_genus,
                 "logits_family": logits_family,
                 "logits_plant": logits_plant,
             }
+
+    def __str__(self) -> str:
+        return f"""ViTMultiHeadClassifier(
+  (backbone): {self.backbone}
+  (classifier_species): {self.classifier_species}
+  (classifier_organ): {self.classifier_organ}
+  (classifier_genus): {self.classifier_genus}
+  (classifier_family): {self.classifier_family}
+  (classifier_plant): {self.classifier_plant}
+)"""
