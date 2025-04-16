@@ -54,15 +54,7 @@ def build_plant_taxonomy(
         print(f"{'  ' * plant_tree.depth(node)}- {node.tag}")
 
     # Save the tree as a Pickle file
-    folder_path = os.path.join(
-        config.project_path,
-        config.data.folder,
-        config.data.utils.folder,
-    )
-    os.makedirs(
-        folder_path,
-        exist_ok=True,
-    )
+    folder_path = check_utils_folder(config)
 
     with open(
         os.path.join(folder_path, config.data.utils.plant_taxonomy_file), "wb"
@@ -165,15 +157,7 @@ def build_organ_hierarchy(config: DictConfig, df_metadata: pd.DataFrame) -> None
     print(organ_hierarchy_df.head())
 
     # Save the DataFrame to a csv file
-    folder_path = os.path.join(
-        config.project_path,
-        config.data.folder,
-        config.data.utils.folder,
-    )
-    os.makedirs(
-        folder_path,
-        exist_ok=True,
-    )
+    folder_path = check_utils_folder(config)
     organ_hierarchy_df.to_csv(
         os.path.join(
             folder_path,
@@ -195,6 +179,94 @@ def read_organ_hierarchy(config: DictConfig) -> pd.DataFrame:
     return species_organs_df
 
 
+def map_species_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
+    species_ids = df_metadata["species_id"].unique()
+    new_species_ids = range(len(species_ids))
+    species_mapping = pd.DataFrame(
+        {
+            "species_id": species_ids,
+            "species_name": [
+                df_metadata[df_metadata["species_id"] == sid]["species"].iloc[0]
+                for sid in species_ids
+            ],
+            "new_species_id": new_species_ids,
+        }
+    )
+
+    folder_path = check_utils_folder(config)
+
+    species_mapping.to_csv(
+        os.path.join(
+            folder_path,
+            config.data.utils.species_mapping,
+        ),
+        index=False,
+    )
+
+
+def map_genus_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
+    genus_names = df_metadata["genus"].unique()
+    genus_ids = range(len(genus_names))
+    genus_mapping = pd.DataFrame({"genus_name": genus_names, "genus_id": genus_ids})
+
+    folder_path = check_utils_folder(config)
+
+    genus_mapping.to_csv(
+        os.path.join(
+            folder_path,
+            config.data.utils.genus_mapping,
+        ),
+        index=False,
+    )
+
+
+def map_family_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
+    family_names = df_metadata["family"].unique()
+    family_ids = range(len(family_names))
+    family_mapping = pd.DataFrame(
+        {"family_name": family_names, "family_id": family_ids}
+    )
+
+    folder_path = check_utils_folder(config)
+
+    family_mapping.to_csv(
+        os.path.join(
+            folder_path,
+            config.data.utils.family_mapping,
+        ),
+        index=False,
+    )
+
+
+def map_organ_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
+    organ_names = df_metadata["organ"].unique()
+    organ_ids = range(len(organ_names))
+    organ_mapping = pd.DataFrame({"organ_name": organ_names, "organ_id": organ_ids})
+
+    folder_path = check_utils_folder(config)
+
+    organ_mapping.to_csv(
+        os.path.join(
+            folder_path,
+            config.data.utils.organ_mapping,
+        ),
+        index=False,
+    )
+
+
+def check_utils_folder(config: DictConfig) -> str:
+    folder_path = os.path.join(
+        config.project_path,
+        config.data.folder,
+        config.data.utils.folder,
+    )
+    os.makedirs(
+        folder_path,
+        exist_ok=True,
+    )
+    return str(folder_path)
+
+
 @hydra.main(
     version_base=None,
     config_path="config",
@@ -206,11 +278,12 @@ def main(
     # Read the CSV file
     df_metadata, _, _ = data.load(config)
 
-    # Print how many organs has each species in the training dataset
-    get_organ_number(df_metadata)
+    map_species_str_to_id(config, df_metadata)
+    map_genus_str_to_id(config, df_metadata)
+    map_family_str_to_id(config, df_metadata)
+    map_organ_str_to_id(config, df_metadata)
 
     build_plant_taxonomy(config, df_metadata)
-
     build_organ_hierarchy(config, df_metadata)
 
 

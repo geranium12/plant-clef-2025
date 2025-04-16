@@ -18,8 +18,12 @@ data:
   test_images_folder: "PlantCLEF2025_test_images/PlantCLEF2025_test_images/"
   utils:
     folder: "utils/"
-    plant_taxonomy_file: "plant_taxonomy.json"
+    plant_taxonomy_file: "plant_taxonomy.pkl"
     organ_hierarchy_file: "organ_hierarchy.csv"
+    genus_mapping: "genus_ids.csv"
+    family_mapping: "family_ids.csv"
+    organ_mapping: "organ_ids.csv"
+    species_mapping: "species_ids.csv"
 
 models:
   name: "vit_base_patch14_reg4_dinov2.lvd142m"
@@ -47,9 +51,11 @@ training:
   num_workers: 1
   min_score: 0.1
   top_k_tile: 2
+  lr: 1e-4
+  epochs: 1
 
-image_width: 400
-image_height: 400
+image_width: 518
+image_height: 518
 
 submission_file: "submission.csv"
 
