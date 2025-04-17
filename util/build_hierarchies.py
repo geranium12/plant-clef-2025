@@ -75,7 +75,7 @@ def read_plant_taxonomy(config: DictConfig) -> Tree:
         return pickle.load(file)
 
 
-def get_taxonomy_from_species(plant_tree: Tree, species: str) -> tuple[str, str]:
+def get_genus_family_from_species(plant_tree: Tree, species: str) -> tuple[str, str]:
     # Find the species node
     species_node = plant_tree.get_node(species)
     if species_node is None:
@@ -269,7 +269,7 @@ def check_utils_folder(config: DictConfig) -> str:
 
 @hydra.main(
     version_base=None,
-    config_path="config",
+    config_path="../config",
     config_name="config",
 )
 def main(

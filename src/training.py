@@ -19,11 +19,6 @@ from treelib import Tree
 
 import src.augmentation
 import wandb
-from build_hierarchies import (
-    check_utils_folder,
-    get_taxonomy_from_species,
-    read_plant_taxonomy,
-)
 from src.data import ConcatenatedDataset, DataSplit, TrainDataset, UnlabeledDataset
 from src.evaluating import Evaluator
 from src.utils import (
@@ -33,6 +28,11 @@ from src.utils import (
     organ_name_to_id,
     species_id_to_name,
     species_name_to_new_id,
+)
+from util.build_hierarchies import (
+    check_utils_folder,
+    get_genus_family_from_species,
+    read_plant_taxonomy,
 )
 
 
@@ -70,7 +70,7 @@ def gather_all_labels(
             organ_labels.append(-1)
         else:
             species_name = species_id_to_name(species_id.item(), species_mapping)
-            genus_name, family_name = get_taxonomy_from_species(
+            genus_name, family_name = get_genus_family_from_species(
                 plant_tree, species_name
             )
             new_species_id = species_name_to_new_id(species_name, species_mapping)
