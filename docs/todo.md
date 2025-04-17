@@ -5,8 +5,8 @@
 - [x] Add 4 heads (organ, genus, family, plant/no plant) to the pre-trained kaggle model (only-classifier-then-all)
 - [x] Add train to the pipeline
 - [ ] Add eval to the pipeline
-- [ ] Reweigh loss
-- [ ] Add one augmentation that is a pipe of many random ones
+- [x] Implement weighted loss
+- [x] Add one augmentation that is a pipe of many random ones
 
 #### Robin
 - [x] Implement data augmentation (tiling, color change, rotation, ...)
