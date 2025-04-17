@@ -55,6 +55,8 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore[misc]
             for param in self.backbone.parameters():
                 param.requires_grad = False
 
+        self.head_names = ["species", "genus", "family", "plant", "organ"]
+
     def forward(
         self,
         pixel_values: torch.Tensor,

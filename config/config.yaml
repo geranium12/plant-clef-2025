@@ -49,18 +49,24 @@ training:
     "GaussianBlur",
   ]
   batch_size: 32
-  shuffle: false
+  shuffle: True
   num_workers: 1
   min_score: 0.1
   top_k_tile: 2
   lr: 1e-4
   epochs: 1
   loss_weights:
-    species: 3.0
+    species: 1.0
     genus: 1.0
     family: 1.0
     plant: 1.0
     organ: 1.0
+
+evaluating:
+  every: 100
+  batch_size: 32
+  shuffle: True
+  num_workers: 1
 
 image_width: 518
 image_height: 518
