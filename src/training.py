@@ -169,11 +169,6 @@ def train(
                 outputs = model(
                     pixel_values=images, labels=labels, plant_mask=plant_mask
                 )
-                loss = outputs["loss"]
-                loss.backward()
-                optimizer.step()
-
-                running_loss += loss.item()
 
                 loss_species = outputs["loss_species"]
                 loss_genus = outputs["loss_genus"]
@@ -181,11 +176,24 @@ def train(
                 loss_plant = outputs["loss_plant"]
                 loss_organ = outputs["loss_organ"]
 
+                loss = (
+                    config.training.loss_weights.species * loss_species
+                    + config.training.loss_weights.genus * loss_genus
+                    + config.training.loss_weights.family * loss_family
+                    + config.training.loss_weights.plant * loss_plant
+                    + config.training.loss_weights.organ * loss_organ
+                )
+
+                loss.backward()
+                optimizer.step()
+
+                running_loss += loss.item()
+
                 wandb.log(
                     {
-                        "loss": loss.item(),
                         "epoch": epoch,
                         "iter": iteration,
+                        "loss": loss.item(),
                         "loss_species": loss_species.item(),
                         "loss_genus": loss_genus.item(),
                         "loss_family": loss_family.item(),

@@ -55,6 +55,12 @@ training:
   top_k_tile: 2
   lr: 1e-4
   epochs: 1
+  loss_weights:
+    species: 3.0
+    genus: 1.0
+    family: 1.0
+    plant: 1.0
+    organ: 1.0
 
 image_width: 518
 image_height: 518

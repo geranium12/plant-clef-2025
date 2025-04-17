@@ -104,10 +104,7 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore[misc]
                 loss_organ = ce_loss(logits_organ, labels["organ"])
             loss_plant = bce_loss(logits_plant, labels["plant"])
 
-            # TODO: Add loss weighting
-            loss = loss_species + loss_genus + loss_family + loss_plant + loss_organ
             return {
-                "loss": loss,
                 "loss_organ": loss_organ,
                 "loss_species": loss_species,
                 "loss_genus": loss_genus,
