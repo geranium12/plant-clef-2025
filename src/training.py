@@ -19,7 +19,7 @@ from treelib import Tree
 
 import src.augmentation
 import wandb
-from src.data import ConcatenatedDataset, DataSplit, TrainDataset, UnlabeledDataset
+from src.data import ConcatenatedDataset, DataSplit, NonPlantDataset, PlantDataset
 from src.evaluating import Evaluator
 from src.utils import (
     family_name_to_id,
@@ -29,7 +29,7 @@ from src.utils import (
     species_id_to_name,
     species_name_to_new_id,
 )
-from util.build_hierarchies import (
+from utils.build_hierarchies import (
     check_utils_folder,
     get_genus_family_from_species,
     read_plant_taxonomy,
@@ -118,7 +118,7 @@ def train(
 
     train_dataset = ConcatenatedDataset(
         [
-            TrainDataset(
+            PlantDataset(
                 image_folder=os.path.join(
                     config.project_path,
                     config.data.folder,
@@ -129,7 +129,7 @@ def train(
                     labeled_data_split.train_indices if labeled_data_split else None
                 ),
             ),
-            UnlabeledDataset(
+            NonPlantDataset(
                 image_folder=os.path.join(
                     config.project_path,
                     config.data.folder,
@@ -154,7 +154,7 @@ def train(
     if labeled_data_split is not None:
         val_dataset = ConcatenatedDataset(
             [
-                TrainDataset(
+                PlantDataset(
                     image_folder=os.path.join(
                         config.project_path,
                         config.data.folder,
@@ -163,7 +163,7 @@ def train(
                     image_size=(config.image_width, config.image_height),
                     indices=labeled_data_split.val_indices,
                 ),
-                UnlabeledDataset(
+                NonPlantDataset(
                     image_folder=os.path.join(
                         config.project_path,
                         config.data.folder,

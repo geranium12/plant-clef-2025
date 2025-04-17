@@ -146,7 +146,8 @@ def get_image_paths(image_folder: str) -> list[str]:
     return image_paths
 
 
-class TrainDataset(Dataset):  # type: ignore[misc]
+# This types of dataset has species_id and contains only plants
+class PlantDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
         image_folder: str,
@@ -178,7 +179,8 @@ class TrainDataset(Dataset):  # type: ignore[misc]
         return (image, species_id, image_name, 1.0)
 
 
-class UnlabeledDataset(Dataset):  # type: ignore[misc]
+# This types of dataset has no species_id and contains only non-plants
+class NonPlantDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
         image_folder: str,

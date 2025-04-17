@@ -2,8 +2,8 @@ import torch
 
 from src.data import (
     ConcatenatedDataset,
-    TrainDataset,
-    UnlabeledDataset,
+    NonPlantDataset,
+    PlantDataset,
     get_image_paths,
     get_labeled_data_split,
     get_samples,
@@ -51,13 +51,13 @@ def test_other_deterministic_order() -> None:
 def test_dataset_concatenation() -> None:
     return
     # Test to see if the concatenated dataset returns the correct number of samples
-    train_dataset = TrainDataset(
+    train_dataset = PlantDataset(
         image_folder=TRAIN_FILE_DIR,
         image_size=(400, 400),
         transform=None,
         indices=None,
     )
-    unlabeled_dataset = UnlabeledDataset(
+    unlabeled_dataset = NonPlantDataset(
         image_folder=OTHER_TRAIN_FILE_DIR,
         image_size=(400, 400),
         transform=None,

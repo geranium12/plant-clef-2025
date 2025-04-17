@@ -11,14 +11,14 @@ from torch.utils.data import DataLoader
 import src.data as data
 import src.training as training
 import wandb
-from build_hierarchies import (
+from src import prediction, submission
+from src.utils import load_model
+from src.vit_multi_head_classifier import ViTMultiHeadClassifier
+from utils.build_hierarchies import (
     get_organ_number,
     get_plant_tree_number,
     read_plant_taxonomy,
 )
-from src import prediction, submission
-from src.utils import load_model
-from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 
 
 def pipeline(
