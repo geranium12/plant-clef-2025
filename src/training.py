@@ -71,145 +71,143 @@ def train(
         filter(lambda p: p.requires_grad, model.parameters()), lr=config.training.lr
     )
 
-    for augmentation_name in config.training.augmentations:
-        augmentation = src.augmentation.get_data_augmentation(config, augmentation_name)
-        train_dataset = ConcatenatedDataset(
-            [
-                TrainDataset(
-                    image_folder=os.path.join(
-                        config.project_path,
-                        config.data.folder,
-                        config.data.train_folder,
-                    ),
-                    image_size=(config.image_width, config.image_height),
-                    transform=augmentation,
-                    indices=(
-                        labeled_data_split.train_indices if labeled_data_split else None
-                    ),
+    train_dataset = ConcatenatedDataset(
+        [
+            TrainDataset(
+                image_folder=os.path.join(
+                    config.project_path,
+                    config.data.folder,
+                    config.data.train_folder,
                 ),
-                UnlabeledDataset(
-                    image_folder=os.path.join(
-                        config.project_path,
-                        config.data.folder,
-                        config.data.other.folder,
-                    ),
-                    image_size=(config.image_width, config.image_height),
-                    transform=augmentation,
-                    indices=unlabeled_data_split.train_indices
-                    if unlabeled_data_split
-                    else None,
+                image_size=(config.image_width, config.image_height),
+                indices=(
+                    labeled_data_split.train_indices if labeled_data_split else None
                 ),
-            ]
-        )
+            ),
+            UnlabeledDataset(
+                image_folder=os.path.join(
+                    config.project_path,
+                    config.data.folder,
+                    config.data.other.folder,
+                ),
+                image_size=(config.image_width, config.image_height),
+                indices=unlabeled_data_split.train_indices
+                if unlabeled_data_split
+                else None,
+            ),
+        ]
+    )
 
-        train_dataloader = DataLoader(
-            dataset=train_dataset,
-            batch_size=config.training.batch_size,
-            shuffle=config.training.shuffle,
-            num_workers=config.training.num_workers,
-            pin_memory=True,
-        )
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
+        batch_size=config.training.batch_size,
+        shuffle=config.training.shuffle,
+        num_workers=config.training.num_workers,
+        pin_memory=True,
+    )
 
-        for epoch in range(config.training.epochs):
-            running_loss = 0.0
-            for iteration, batch in tqdm(
-                enumerate(train_dataloader),
-                desc="Training",
-                total=len(train_dataloader),
-            ):
-                images, species_labels, images_names, plant_labels = batch
-                images = images.to(device)
-                species_labels = species_labels.to(device)
-                plant_labels = plant_labels.to(device)
-                labels = {}
-                labels["plant"] = plant_labels
-                plant_mask = plant_labels == 1
+    for epoch in range(config.training.epochs):
+        running_loss = 0.0
+        for iteration, batch in tqdm(
+            enumerate(train_dataloader),
+            desc="Training",
+            total=len(train_dataloader),
+        ):
+            images, species_labels, images_names, plant_labels = batch
+            images = images.to(device)
 
-                new_species_labels = []
-                genus_labels = []
-                family_labels = []
-                organ_labels = []
-                for i, species_id in enumerate(species_labels):
-                    if species_id is None:
-                        new_species_labels.append(-1)
-                        genus_labels.append(-1)
-                        family_labels.append(-1)
-                        organ_labels.append(-1)
-                    else:
-                        species_name = species_id_to_name(
-                            species_id.item(), species_mapping
-                        )
-                        genus_name, family_name = get_taxonomy_from_species(
-                            plant_tree, species_name
-                        )
-                        new_species_id = species_name_to_new_id(
-                            species_name, species_mapping
-                        )
-                        genus_id = genus_name_to_id(genus_name, genus_mapping)
-                        family_id = family_name_to_id(family_name, family_mapping)
-                        new_species_labels.append(new_species_id)
-                        genus_labels.append(genus_id)
-                        family_labels.append(family_id)
+            augmentation = src.augmentation.get_random_data_augmentation(config)
+            images = augmentation(images)
 
-                        image_name = images_names[i]
-                        organ_name = image_path_to_organ_name(image_name, df_metadata)
-                        organ_id = organ_name_to_id(organ_name, organ_mapping)
-                        organ_labels.append(organ_id)
+            species_labels = species_labels.to(device)
+            plant_labels = plant_labels.to(device)
+            labels = {}
+            labels["plant"] = plant_labels
+            plant_mask = plant_labels == 1
 
-                new_species_labels = torch.tensor(new_species_labels).to(device)
-                genus_labels = torch.tensor(genus_labels).to(device)
-                family_labels = torch.tensor(family_labels).to(device)
-                organ_labels = torch.tensor(organ_labels).to(device)
-                labels["species"] = new_species_labels
-                labels["genus"] = genus_labels
-                labels["family"] = family_labels
-                labels["organ"] = organ_labels
+            new_species_labels = []
+            genus_labels = []
+            family_labels = []
+            organ_labels = []
+            for i, species_id in enumerate(species_labels):
+                if species_id is None:
+                    new_species_labels.append(-1)
+                    genus_labels.append(-1)
+                    family_labels.append(-1)
+                    organ_labels.append(-1)
+                else:
+                    species_name = species_id_to_name(
+                        species_id.item(), species_mapping
+                    )
+                    genus_name, family_name = get_taxonomy_from_species(
+                        plant_tree, species_name
+                    )
+                    new_species_id = species_name_to_new_id(
+                        species_name, species_mapping
+                    )
+                    genus_id = genus_name_to_id(genus_name, genus_mapping)
+                    family_id = family_name_to_id(family_name, family_mapping)
+                    new_species_labels.append(new_species_id)
+                    genus_labels.append(genus_id)
+                    family_labels.append(family_id)
 
-                optimizer.zero_grad()
-                outputs = model(
-                    pixel_values=images, labels=labels, plant_mask=plant_mask
-                )
+                    image_name = images_names[i]
+                    organ_name = image_path_to_organ_name(image_name, df_metadata)
+                    organ_id = organ_name_to_id(organ_name, organ_mapping)
+                    organ_labels.append(organ_id)
 
-                loss_species = outputs["loss_species"]
-                loss_genus = outputs["loss_genus"]
-                loss_family = outputs["loss_family"]
-                loss_plant = outputs["loss_plant"]
-                loss_organ = outputs["loss_organ"]
+            new_species_labels = torch.tensor(new_species_labels).to(device)
+            genus_labels = torch.tensor(genus_labels).to(device)
+            family_labels = torch.tensor(family_labels).to(device)
+            organ_labels = torch.tensor(organ_labels).to(device)
+            labels["species"] = new_species_labels
+            labels["genus"] = genus_labels
+            labels["family"] = family_labels
+            labels["organ"] = organ_labels
 
-                loss = (
-                    config.training.loss_weights.species * loss_species
-                    + config.training.loss_weights.genus * loss_genus
-                    + config.training.loss_weights.family * loss_family
-                    + config.training.loss_weights.plant * loss_plant
-                    + config.training.loss_weights.organ * loss_organ
-                )
+            optimizer.zero_grad()
+            outputs = model(pixel_values=images, labels=labels, plant_mask=plant_mask)
 
-                loss.backward()
-                optimizer.step()
+            loss_species = outputs["loss_species"]
+            loss_genus = outputs["loss_genus"]
+            loss_family = outputs["loss_family"]
+            loss_plant = outputs["loss_plant"]
+            loss_organ = outputs["loss_organ"]
 
-                running_loss += loss.item()
+            loss = (
+                config.training.loss_weights.species * loss_species
+                + config.training.loss_weights.genus * loss_genus
+                + config.training.loss_weights.family * loss_family
+                + config.training.loss_weights.plant * loss_plant
+                + config.training.loss_weights.organ * loss_organ
+            )
 
-                wandb.log(
-                    {
-                        "epoch": epoch,
-                        "iter": iteration,
-                        "loss": loss.item(),
-                        "loss_species": loss_species.item(),
-                        "loss_genus": loss_genus.item(),
-                        "loss_family": loss_family.item(),
-                        "loss_plant": loss_plant.item(),
-                        "loss_organ": loss_organ.item(),
-                    }
-                )
+            loss.backward()
+            optimizer.step()
 
-                print(
-                    f"Iter: {iteration}, Loss: {loss.item():.4f}, Loss Species: {loss_species.item():.4f}, "
-                    f"Loss Genus: {loss_genus.item():.4f}, Loss Family: {loss_family.item():.4f}, "
-                    f"Loss Plant: {loss_plant.item():.4f}, Loss Organ: {loss_organ.item():.4f}"
-                )
+            running_loss += loss.item()
 
-            avg_loss = running_loss / len(train_dataloader)
-            print(f"Epoch [{epoch + 1}/{config.training.epochs}], Loss: {avg_loss:.4f}")
+            wandb.log(
+                {
+                    "epoch": epoch,
+                    "iter": iteration,
+                    "loss": loss.item(),
+                    "loss_species": loss_species.item(),
+                    "loss_genus": loss_genus.item(),
+                    "loss_family": loss_family.item(),
+                    "loss_plant": loss_plant.item(),
+                    "loss_organ": loss_organ.item(),
+                }
+            )
+
+            print(
+                f"Iter: {iteration}, Loss: {loss.item():.4f}, Loss Species: {loss_species.item():.4f}, "
+                f"Loss Genus: {loss_genus.item():.4f}, Loss Family: {loss_family.item():.4f}, "
+                f"Loss Plant: {loss_plant.item():.4f}, Loss Organ: {loss_organ.item():.4f}"
+            )
+
+        avg_loss = running_loss / len(train_dataloader)
+        print(f"Epoch [{epoch + 1}/{config.training.epochs}], Loss: {avg_loss:.4f}")
 
     data_config = timm.data.resolve_model_data_config(model)
     model_info = ModelInfo(
