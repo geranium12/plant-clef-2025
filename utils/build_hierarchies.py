@@ -3,6 +3,7 @@ import pickle
 
 import hydra
 import pandas as pd
+import numpy as np
 from omegaconf import (
     DictConfig,
 )
@@ -10,7 +11,9 @@ from tqdm import tqdm
 from treelib import Tree
 
 from src import data
+from typing import Optional, Union
 
+import torch
 
 # family -> genus -> species
 def build_plant_taxonomy(
@@ -179,94 +182,101 @@ def read_organ_hierarchy(config: DictConfig) -> pd.DataFrame:
     return species_organs_df
 
 
-def map_species_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
-    species_ids = df_metadata["species_id"].unique()
-    new_species_ids = range(len(species_ids))
-    species_mapping = pd.DataFrame(
-        {
-            "species_id": species_ids,
-            "species_name": [
-                df_metadata[df_metadata["species_id"] == sid]["species"].iloc[0]
-                for sid in species_ids
-            ],
-            "new_species_id": new_species_ids,
-        }
-    )
+# family -> genus -> species
+class PlantHierarchy(object):
 
-    folder_path = check_utils_folder(config)
+    families: np.ndarray[np.str_]
+    genera: np.ndarray[np.str_]
+    species: np.ndarray[np.str_]
 
-    species_mapping.to_csv(
-        os.path.join(
-            folder_path,
-            config.data.utils.species_mapping,
-        ),
-        index=False,
-    )
+    species_to_genus: np.ndarray[np.int32]
+    genus_to_family: np.ndarray[np.int32]
 
+    def __init__(self, df_metadata: Optional[Union[pd.DataFrame,str]]=None):
+        if isinstance(df_metadata, pd.DataFrame):
+            self.build_hierarchy(df_metadata)
+        elif isinstance(df_metadata, str):
+            self.load(df_metadata)
 
-def map_genus_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
-    genus_names = df_metadata["genus"].unique()
-    genus_ids = range(len(genus_names))
-    genus_mapping = pd.DataFrame({"genus_name": genus_names, "genus_id": genus_ids})
+        
+    def build_hierarchy(self, df_metadata: pd.DataFrame, *, verbose: bool=False):
+        #tqdm(df_metadata["species"].unique(), desc="Processing species")
+        if verbose:
+            print('Building Species Index')
+        data = np.unique(df_metadata[['species','genus','family']].to_numpy(dtype=str), axis=0)
+        self.species = data[:,0].copy()
 
-    folder_path = check_utils_folder(config)
+        if verbose:
+            print('Building Genus Index')
+        genfam, self.species_to_genus = np.unique(data[:,[1,2]], axis=0, return_inverse=True)
+        self.genera = genfam[:,0].copy()
 
-    genus_mapping.to_csv(
-        os.path.join(
-            folder_path,
-            config.data.utils.genus_mapping,
-        ),
-        index=False,
-    )
+        if verbose:
+            print('Building Family Index')
+        self.families, self.genus_to_family = np.unique(genfam[:,1], return_inverse=True)
 
+        if verbose:
+            print('Building Finished')
 
-def map_family_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
-    family_names = df_metadata["family"].unique()
-    family_ids = range(len(family_names))
-    family_mapping = pd.DataFrame(
-        {"family_name": family_names, "family_id": family_ids}
-    )
+    def family_to_index(self, family: np.ndarray[str])-> np.ndarray[np.int32]:
+        return np.searchsorted(self.families, family)
 
-    folder_path = check_utils_folder(config)
+    def genus_to_index(self, genus: np.ndarray[str])-> np.ndarray[np.int32]:
+        return np.searchsorted(self.genera, genus)
 
-    family_mapping.to_csv(
-        os.path.join(
-            folder_path,
-            config.data.utils.family_mapping,
-        ),
-        index=False,
-    )
+    def species_to_index(self, species: np.ndarray[str])-> np.ndarray[np.int32]:
+        return np.searchsorted(self.species, species)
 
+    def batch_to_ids(self, batch: np.ndarray[str])-> torch.Tensor: # ints 
+        '''
+        batch: nx3 array of strings, columns in order ('species', 'genus', 'family')
+        
+        output: nx3 tensor of indices
+        '''
+        nm = batch.shape
+        if len(nm) < 2:
+            return torch.from_numpy(self.species_to_index(batch))
+        
+        out = np.empty(nm, dtype=int)
+        out[:,0] = self.species_to_index(batch[:,0])
+        if batch.shape[1] > 1:
+            out[:,1] = self.genus_to_index(batch[:,1])
+        if batch.shape[2] > 2:
+            out[:,2] = self.family_to_index(batch[:,2])
 
-def map_organ_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
-    organ_names = df_metadata["organ"].unique()
-    organ_ids = range(len(organ_names))
-    organ_mapping = pd.DataFrame({"organ_name": organ_names, "organ_id": organ_ids})
+        return torch.from_numpy(out)
 
-    folder_path = check_utils_folder(config)
+    def merge_probabilities(self,
+                            species: torch.Tensor, # floats
+                            genus: Optional[torch.Tensor]=None, # floats
+                            family: Optional[torch.Tensor]=None # float
+                            )-> torch.Tensor: # floats
+        probs = species
+        if genus is not None:
+            probs = probs * genus[self.species_to_genus]
+        if family is not None:
+            species_to_family = self.genus_to_family[self.species_to_genus]
+            probs = probs * family[species_to_family]
+        return probs
+        
+    def save(self, file_name: str='./taxonomy.npz'):
+        np.savez_compressed(file_name,
+                            families=self.families,
+                            genera=self.genera,
+                            species=self.species,
+                            species_to_genus=self.species_to_genus,
+                            genus_to_family=self.genus_to_family
+                            )
+    
+    def load(self, file_name: str='./taxonomy.npz'):
+        data = np.load(file_name)
+        self.families = data['families']
+        self.genera = data['genera']
+        self.species = data['species']
+        self.species_to_genus = data['species_to_genus']
+        self.genus_to_family = data['genus_to_family']
 
-    organ_mapping.to_csv(
-        os.path.join(
-            folder_path,
-            config.data.utils.organ_mapping,
-        ),
-        index=False,
-    )
-
-
-def check_utils_folder(config: DictConfig) -> str:
-    folder_path = os.path.join(
-        config.project_path,
-        config.data.folder,
-        config.data.utils.folder,
-    )
-    os.makedirs(
-        folder_path,
-        exist_ok=True,
-    )
-    return str(folder_path)
-
-
+    
 @hydra.main(
     version_base=None,
     config_path="../config",
@@ -278,14 +288,16 @@ def main(
     # Read the CSV file
     df_metadata, _, _ = data.load(config)
 
-    map_species_str_to_id(config, df_metadata)
-    map_genus_str_to_id(config, df_metadata)
-    map_family_str_to_id(config, df_metadata)
-    map_organ_str_to_id(config, df_metadata)
+    PH = PlantHierarchy()
+    PH.build_hierarchy(df_metadata, verbose=True)
+
+    # Print how many organs has each species in the training dataset
+    print_organ_distribution(df_metadata)
 
     build_plant_taxonomy(config, df_metadata)
     build_organ_hierarchy(config, df_metadata)
 
+    
 
 if __name__ == "__main__":
     main()
