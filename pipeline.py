@@ -80,7 +80,7 @@ def pipeline(
         non_plant_data_split=non_plant_data_split,
     )
 
-    test_dataloader = DataLoader(
+    submission_dataloader = DataLoader(
         dataset=data.TestDataset(
             image_folder=os.path.join(
                 config.project_path,
@@ -97,7 +97,7 @@ def pipeline(
     )
 
     image_predictions = prediction.predict(
-        dataloader=test_dataloader,
+        dataloader=submission_dataloader,
         model=model,
         model_info=model_info,
         batch_size=config.training.batch_size,
