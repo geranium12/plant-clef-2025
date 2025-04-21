@@ -205,17 +205,22 @@ class PlantHierarchy(object):
             print('Building Species Index')
         data = np.unique(df_metadata[['species','genus','family']].to_numpy(dtype=str), axis=0)
         self.species = data[:,0].copy()
+        if verbose:
+            print('Species:', self.species.shape)
 
         if verbose:
             print('Building Genus Index')
         genfam, self.species_to_genus = np.unique(data[:,[1,2]], axis=0, return_inverse=True)
         self.genera = genfam[:,0].copy()
+        if verbose:
+            print('Genus:', self.genera.shape)
 
         if verbose:
             print('Building Family Index')
         self.families, self.genus_to_family = np.unique(genfam[:,1], return_inverse=True)
 
         if verbose:
+            print('Family:', self.families.shape)
             print('Building Finished')
 
     def family_to_index(self, family: np.ndarray[str])-> np.ndarray[np.int32]:
@@ -251,12 +256,17 @@ class PlantHierarchy(object):
                             genus: Optional[torch.Tensor]=None, # floats
                             family: Optional[torch.Tensor]=None # float
                             )-> torch.Tensor: # floats
+        '''
+        species: nx7806 tensor of probabilities
+        genus: nx1446 tensor of probabilities
+        family: nx181 tensor of probabilities
+        '''
         probs = species
         if genus is not None:
-            probs = probs * genus[self.species_to_genus]
+            probs = probs * genus[...,torch.from_numpy(self.species_to_genus)]
         if family is not None:
             species_to_family = self.genus_to_family[self.species_to_genus]
-            probs = probs * family[species_to_family]
+            probs = probs * family[...,torch.from_numpy(species_to_family)]
         return probs
         
     def save(self, file_name: str='./taxonomy.npz'):
