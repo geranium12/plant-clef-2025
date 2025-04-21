@@ -9,9 +9,8 @@ from omegaconf import (
 from torch.utils.data import DataLoader
 
 import src.data as data
-import src.training as training
 import wandb
-from src import prediction, submission
+from src import prediction, submission, training
 from src.utils import load_model
 from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 from utils.build_hierarchies import (
@@ -31,7 +30,7 @@ def pipeline(
         class_map,
     ) = data.load(config)
 
-    labeled_data_split = (
+    plant_data_split = (
         None
         if config.training.use_all_data
         else data.get_labeled_data_split(
@@ -44,7 +43,7 @@ def pipeline(
             config.training.test_size,
         )
     )
-    unlabeled_data_split = (
+    non_plant_data_split = (
         None
         if config.training.use_all_data
         else data.get_unlabeled_data_split(
@@ -68,6 +67,7 @@ def pipeline(
         num_labels_genus=num_labels_genus,
         num_labels_family=num_labels_family,
         num_labels_plant=1,
+        device=device,
     )
     print(model)
 
@@ -75,10 +75,9 @@ def pipeline(
         model=model,
         config=config,
         device=device,
-        df_species_ids=df_species_ids,
         df_metadata=df_metadata,
-        labeled_data_split=labeled_data_split,
-        unlabeled_data_split=unlabeled_data_split,
+        plant_data_split=plant_data_split,
+        non_plant_data_split=non_plant_data_split,
     )
 
     test_dataloader = DataLoader(
@@ -92,7 +91,7 @@ def pipeline(
             stride=int(model_info.input_size / 2),
             use_pad=True,
         ),
-        batch_size=config.training.batch_size,
+        batch_size=1,  # config.training.batch_size, TODO: FIX
         num_workers=config.training.num_workers,
         pin_memory=True,
     )
