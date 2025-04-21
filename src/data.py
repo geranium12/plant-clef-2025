@@ -15,12 +15,14 @@ from kornia.contrib import (
 from omegaconf import (
     DictConfig,
 )
-from PIL import Image
+from PIL import Image, ImageFile
 from sklearn.model_selection import train_test_split
 from torch.utils.data import (
     Dataset,
 )
 from tqdm import tqdm
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class PatchDataset(Dataset):  # type: ignore[misc]
@@ -70,6 +72,7 @@ class TestDataset(Dataset):  # type: ignore[misc]
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, str]:
         image_path = self.image_paths[idx]
         image = Image.open(image_path)
+        image = image.convert("RGB")
 
         if self.transform:
             image = self.transform(image).unsqueeze(0)
