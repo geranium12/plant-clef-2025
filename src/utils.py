@@ -68,3 +68,22 @@ def image_path_to_organ_name(image_path: str, df_metadata: pd.DataFrame) -> str:
         raise ValueError(f"Image path '{image_path} not found in metadata")
 
     return str(row["organ"].iloc[0])
+
+
+def calculate_total_loss(
+    outputs: dict[str, torch.Tensor],
+    head_names: list[str],
+    config: DictConfig,
+    device: torch.device,
+) -> torch.Tensor:
+    """Calculates the weighted total loss."""
+    total_loss = torch.tensor(0.0, device=device)
+    weights = config.training.loss_weights
+    for head in head_names:
+        loss_key = f"loss_{head}"
+        if loss_key in outputs:
+            weight = getattr(
+                weights, head, 0.0
+            )  # Get weight, default to 0 if not specified
+            total_loss += weight * outputs[loss_key]
+    return total_loss

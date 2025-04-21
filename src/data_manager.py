@@ -104,8 +104,10 @@ class DataManager:
         self.train_dataset = self._create_dataset("train")
         if self.plant_data_split is not None:
             self.val_dataset = self._create_dataset("val")
+            self.test_dataset = self._create_dataset("test")
         else:
             self.val_dataset = None
+            self.test_dataset = None
 
     def _setup_dataloaders(self) -> None:
         """Sets up train and validation dataloaders."""
@@ -126,6 +128,16 @@ class DataManager:
             )
         else:
             self.val_dataloader = None
+        if self.test_dataset:
+            self.test_dataloader = DataLoader(
+                dataset=self.test_dataset,
+                batch_size=self.config.evaluating.batch_size,
+                shuffle=self.config.evaluating.shuffle,
+                num_workers=self.config.evaluating.num_workers,
+                pin_memory=True,
+            )
+        else:
+            self.test_dataloader = None
 
     def gather_all_labels(
         self,

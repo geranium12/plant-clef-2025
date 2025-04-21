@@ -7,8 +7,7 @@ def test_evaluate_perfect() -> None:
     # Perfect predictions: top-1 predicted class matches the true label for every sample
     y_true = np.array([0, 1, 2])
     y_pred = np.array([[0.9, 0.05, 0.05], [0.1, 0.8, 0.1], [0.05, 0.15, 0.8]])
-    evaluator = Evaluator()
-    metrics = evaluator.evaluate(y_true, y_pred)
+    metrics = Evaluator.compute_metric(y_true, y_pred)
     assert metrics["precision"] == 1.0
     assert metrics["recall"] == 1.0
     assert metrics["f1"] == 1.0
@@ -25,8 +24,7 @@ def test_evaluate_imperfect() -> None:
             [0.6, 0.3, 0.1],  # predicted: 0 (incorrect for true label 2)
         ]
     )
-    evaluator = Evaluator()
-    metrics = evaluator.evaluate(y_true, y_pred)
+    metrics = Evaluator.compute_metric(y_true, y_pred)
     expected_precision = 0.1667
     expected_recall = 0.3333
     expected_f1 = 0.2222
@@ -52,8 +50,7 @@ def test_evaluate_imperfect_2() -> None:
             [0.1, 0.7, 0.2],  # predicted: 1 (correct for true label 1)
         ]
     )
-    evaluator = Evaluator()
-    metrics = evaluator.evaluate(y_true, y_pred)
+    metrics = Evaluator.compute_metric(y_true, y_pred)
     expected_precision = 0.6389
     expected_recall = 0.7222
     expected_f1 = 0.5778
@@ -72,8 +69,7 @@ def test_evaluate_none_correct() -> None:
             [0.7, 0.15, 0.15],  # predicted: 0
         ]
     )
-    evaluator = Evaluator()
-    metrics = evaluator.evaluate(y_true, y_pred)
+    metrics = Evaluator.compute_metric(y_true, y_pred)
     assert metrics["precision"] == 0.0
     assert metrics["recall"] == 0.0
     assert metrics["f1"] == 0.0
