@@ -32,23 +32,14 @@ models:
   pretrained: false
   folder: "models/"
   checkpoint_file: "model_onlyclassifier_then_all/model_best.pth.tar"
+  save_folder: "5heads_all_labels_vit_base_patch14_reg4_dinov2.lvd142m"
+  save_file: "model_best1.pth.tar"
 
 training:
   use_all_data: false # if true, use all data for training
-  val_size: 0.2
+  val_size: 0.05
   test_size: 0.1
-  augmentations: [
-    "Identity",
-    "FlipHorizontal",
-    "FlipVertical",
-    "Rotate",
-    "Jitter",
-    "ResizeCrop",
-    "Perspective",
-    "Sharpness",
-    "GaussianBlur",
-  ]
-  batch_size: 32
+  batch_size: 144
   shuffle: True
   num_workers: 1
   min_score: 0.1
@@ -63,10 +54,10 @@ training:
     organ: 1.0
 
 evaluating:
-  every: 100
-  batch_size: 32
+  every: 1000
+  batch_size: 144
   shuffle: True
-  num_workers: 1
+  num_workers: 8
 
 image_width: 518
 image_height: 518

@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 import src.data as data
 import wandb
 from src import prediction, submission, training
-from src.utils import load_model
+from src.utils import load_model, save_model
 from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 from utils.build_hierarchies import (
     get_organ_number,
@@ -111,6 +111,8 @@ def pipeline(
         config,
         image_predictions,
     )
+
+    save_model(model, config)
 
 
 @hydra.main(

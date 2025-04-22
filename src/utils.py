@@ -23,6 +23,28 @@ def load_model(
     return model
 
 
+def save_model(
+    model: torch.nn.Module,
+    config: DictConfig,
+) -> None:
+    # check if the model folder exists, if not create it
+    os.makedirs(
+        os.path.join(
+            config.project_path,
+            config.models.save_folder,
+        ),
+        exist_ok=True,
+    )
+
+    model_path = os.path.join(
+        config.project_path,
+        config.models.save_folder,
+        config.models.save_file,
+    )
+    torch.save(model.state_dict(), model_path)
+    print(f"Model saved to {model_path}")
+
+
 def species_id_to_name(species_id: int, species_mapping: pd.DataFrame) -> str:
     species_row = species_mapping[species_mapping["species_id"] == species_id]
     if species_row.empty:
