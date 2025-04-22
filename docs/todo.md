@@ -1,15 +1,21 @@
 # TODO
 
 #### Hanna
-- [ ] Add eval to the pipeline
-- [ ] Train 4 heads of the pre-trained kaggle model (only-classifier-then-all) on augmented data + non-plant datasets
+- [x] Add eval to the pipeline
+- [ ] Train 5 heads of the pre-trained kaggle model (only-classifier-then-all) on augmented data + non-plant datasets
+- [ ] Train the whole model (unfreeze the backbone) on augmented data + non-plant datasets
+- [ ] Add accelerate
+- [ ] Add checkpointing during training
+- [ ] Add EarlyStopping
+- [ ] Submit a model (no train) to test our pipeline
 
 #### Robin
 - [ ] Integrate the LUCAS no labels dataset
 - [ ] Combine low-resource data classes
+- [ ] Figure out what DS@GT does for this challenge
 
 #### Tomo
-- [ ] Use trees from metadata to train 4 classifier heads and eval on multiplication of possible options
+- [ ] Use trees for eval on multiplication of possible options
 - [ ] Implement multi-scale tiling for inference
 
 ## Later TODO
