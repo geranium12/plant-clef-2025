@@ -75,8 +75,11 @@ class Evaluator:
         images, species_labels, images_names = batch
         images = images.to(self.device)
         species_labels = species_labels.to(self.device)
-        plant_labels = torch.tensor(species_labels != -1).to(
-            dtype=torch.float32, device=self.device
+        plant_labels = (
+            (species_labels != -1)
+            .clone()
+            .detach()
+            .to(dtype=torch.float32, device=self.device)
         )
 
         # Gather labels
