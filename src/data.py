@@ -1,8 +1,6 @@
-import math
 import os
 import random
 from dataclasses import astuple, dataclass
-from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -20,7 +18,6 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import (
     Dataset,
 )
-from tqdm import tqdm
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -156,7 +153,7 @@ class PlantDataset(Dataset):  # type: ignore[misc]
         image_folder: str,
         image_size: tuple[int, int] = (400, 400),
         transform: ttransforms.transforms = None,
-        indices: Optional[list[int]] = None,
+        indices: list[int] | None = None,
     ) -> None:
         self.image_size = image_size
         self.transform = transform if transform is not None else ttransforms.ToTensor()
@@ -171,7 +168,7 @@ class PlantDataset(Dataset):  # type: ignore[misc]
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int, str, float]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int, str]:
         species_id, image_path = self.samples[idx]
         species_id = int(species_id)
         image = Image.open(image_path)
@@ -179,7 +176,7 @@ class PlantDataset(Dataset):  # type: ignore[misc]
         image = image.resize(self.image_size)
         image = self.transform(image)
         image_name = os.path.basename(image_path)
-        return (image, species_id, image_name, 1.0)
+        return (image, species_id, image_name)
 
 
 # This types of dataset has no species_id and contains only non-plants
@@ -189,7 +186,7 @@ class NonPlantDataset(Dataset):  # type: ignore[misc]
         image_folder: str,
         image_size: tuple[int, int] = (400, 400),
         transform: ttransforms.transforms = None,
-        indices: Optional[list[int]] = None,
+        indices: list[int] | None = None,
     ) -> None:
         self.image_size = image_size
         self.transform = transform if transform is not None else ttransforms.ToTensor()
@@ -204,14 +201,14 @@ class NonPlantDataset(Dataset):  # type: ignore[misc]
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int, str, float]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int, str]:
         image_path = self.samples[idx]
         image = Image.open(image_path)
         image = image.convert("RGB")
         image = image.resize(self.image_size)
         image = self.transform(image)
         image_name = os.path.basename(image_path)
-        return (image, -1, image_name, 0.0)
+        return (image, -1, image_name)
 
 
 class ConcatenatedDataset(Dataset):  # type: ignore[misc]
@@ -225,7 +222,7 @@ class ConcatenatedDataset(Dataset):  # type: ignore[misc]
     def __len__(self) -> int:
         return int(self.end_indices[-1])
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, Optional[str]]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, str | None]:
         idx = (idx % len(self) + len(self)) % len(self)
         for i, end_idx in enumerate(self.end_indices):
             if idx < end_idx:
@@ -338,23 +335,6 @@ def get_unlabeled_data_split(
     )
 
 
-def read_csv_in_chunks(path: str, n_lines: int, **read_params: Any) -> pd.DataFrame:
-    if "chunksize" not in read_params or read_params["chunksize"] < 1:
-        read_params["chunksize"] = 10000
-    chunks = [0] * math.ceil(n_lines / read_params["chunksize"])
-    for i, chunk in enumerate(
-        tqdm(
-            pd.read_csv(path, **read_params),
-            total=math.ceil(n_lines / read_params["chunksize"]),
-            desc="Reading CSV",
-        )
-    ):
-        chunks[i] = chunk
-    concat_df = pd.concat(chunks, axis=0)
-    del chunks
-    return concat_df
-
-
 def load(
     config: DictConfig,
 ) -> tuple[
@@ -366,11 +346,12 @@ def load(
         config.project_path, config.data.folder, config.data.metadata.folder
     )
 
-    df_metadata = read_csv_in_chunks(
+    df_metadata = pd.read_csv(
         path=os.path.join(metadata_path, config.data.metadata.training),
-        n_lines=1408034,
         sep=";",
         dtype={"partner": str},
+        chunksize=10_000,
+        verbose=True,
     )
 
     df_species_ids = pd.read_csv(

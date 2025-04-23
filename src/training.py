@@ -71,13 +71,15 @@ class Trainer:
         print(print_str)
 
     def _train_step(
-        self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+        self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor]
     ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
         """Performs a single training step."""
-        images, species_labels, images_names, plant_labels = batch
+        images, species_labels, images_names = batch
         images = images.to(self.device)
         species_labels = species_labels.to(self.device)
-        plant_labels = plant_labels.to(self.device)
+        plant_labels = torch.tensor(species_labels != -1).to(
+            dtype=torch.float32, device=self.device
+        )
 
         # Apply augmentation
         augmentation = src.augmentation.get_random_data_augmentation(self.config)
