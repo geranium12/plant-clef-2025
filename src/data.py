@@ -1,6 +1,7 @@
 import os
 import random
 from dataclasses import astuple, dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -18,6 +19,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import (
     Dataset,
 )
+from tqdm import tqdm
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -335,6 +337,22 @@ def get_unlabeled_data_split(
     )
 
 
+def read_csv_in_chunks(path: str, **read_params: Any) -> pd.DataFrame:
+    if "chunksize" not in read_params or read_params["chunksize"] < 1:
+        read_params["chunksize"] = 10000
+    chunks = []
+    for _, chunk in enumerate(
+        tqdm(
+            pd.read_csv(path, **read_params),
+            desc="Reading CSV",
+        )
+    ):
+        chunks.append(chunk)
+    concat_df = pd.concat(chunks, axis=0)
+    del chunks
+    return concat_df
+
+
 def load(
     config: DictConfig,
 ) -> tuple[
@@ -346,12 +364,10 @@ def load(
         config.project_path, config.data.folder, config.data.metadata.folder
     )
 
-    df_metadata = pd.read_csv(
+    df_metadata = read_csv_in_chunks(
         path=os.path.join(metadata_path, config.data.metadata.training),
         sep=";",
         dtype={"partner": str},
-        chunksize=10_000,
-        verbose=True,
     )
 
     df_species_ids = pd.read_csv(
