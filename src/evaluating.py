@@ -7,7 +7,6 @@ from sklearn.metrics import f1_score, precision_score, recall_score
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-import wandb
 from src.data_manager import DataManager
 from src.utils import calculate_total_loss
 
@@ -83,26 +82,31 @@ class Evaluator:
             outputs = self.model(
                 pixel_values=images, labels=labels, plant_mask=labels["plant"] == 1
             )
+            all_outputs, all_labels = self.accelerator.gather_for_metrics(
+                (outputs, labels)
+            )
+
             loss = calculate_total_loss(
                 outputs, self.model.module.head_names, self.config
             )
 
-        return loss, outputs, labels
+        return loss, all_outputs, all_labels
 
     def _evaluate_head_batch(
-        self, logits: torch.Tensor, labels: torch.Tensor, prefix: str
+        self, logits: torch.Tensor, labels: torch.Tensor, prefix: str, step: int
     ) -> torch.Tensor:
         """Calculates and logs batch metrics for a specific head."""
         probs = torch.nn.functional.softmax(logits, dim=1).cpu()
         labels = labels.view(-1).cpu()  # Ensure labels are 1D for evaluator
 
         metrics = Evaluator.compute_metric(labels, probs)
-        wandb.log(
+        self.accelerator.log(
             {
                 f"{prefix}/batch_precision": metrics["precision"],
                 f"{prefix}/batch_recall": metrics["recall"],
                 f"{prefix}/batch_f1": metrics["f1"],
-            }
+            },
+            step=step,
         )
 
         return probs
@@ -122,7 +126,9 @@ class Evaluator:
             A dictionary containing overall loss and per-head metrics.
         """
         if not dataloader:
-            print(f"Skipping evaluation for {prefix} as dataloader is missing.")
+            self.accelerator.print(
+                f"Skipping evaluation for {prefix} as dataloader is missing."
+            )
             return {}
 
         self.model, dataloader = self.accelerator.prepare(self.model, dataloader)
@@ -137,7 +143,7 @@ class Evaluator:
         running_loss = 0.0
         results = {}
 
-        for _, batch in tqdm(
+        for iteration, batch in tqdm(
             enumerate(dataloader),
             desc=f"Evaluating ({prefix.capitalize()})",
             total=len(dataloader),
@@ -164,7 +170,12 @@ class Evaluator:
 
                 # Evaluate batch metrics and get probabilities
                 probs = self._evaluate_head_batch(
-                    selected_logits, lbls, prefix=f"{prefix}/{head_name}"
+                    selected_logits,
+                    lbls,
+                    prefix=f"{prefix}/{head_name}",
+                    step=iteration * self.accelerator.num_processes
+                    + epoch * len(dataloader)
+                    + self.accelerator.process_index,
                 )
 
                 # Store predictions and labels for epoch-level evaluation
@@ -172,7 +183,7 @@ class Evaluator:
                 all_labels[head_name].append(lbls.cpu().numpy())
 
         avg_loss = running_loss / len(dataloader)
-        wandb.log({f"{prefix}/epoch_loss": avg_loss, "epoch": epoch})
+        self.accelerator.log({f"{prefix}/epoch_loss": avg_loss}, step=epoch)
         print(
             f"{prefix.capitalize()} Epoch: {epoch + 1}/{self.config.training.epochs}, Avg Validation Loss: {avg_loss:.4f}"
         )
@@ -184,13 +195,13 @@ class Evaluator:
             y_true = y_true.ravel()  # Ensure y_true is 1D
 
             metrics = Evaluator.compute_metric(y_true, y_pred)
-            wandb.log(
+            self.accelerator.log(
                 {
                     f"{prefix}/{head_name}/epoch_precision": metrics["precision"],
                     f"{prefix}/{head_name}/epoch_recall": metrics["recall"],
                     f"{prefix}/{head_name}/epoch_f1": metrics["f1"],
-                    "epoch": epoch,
-                }
+                },
+                step=epoch,
             )
 
             print(

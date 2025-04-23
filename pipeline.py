@@ -9,7 +9,6 @@ from omegaconf import (
 from torch.utils.data import DataLoader
 
 import src.data as data
-import wandb
 from src import prediction, submission, training
 from src.utils import load_model
 from src.vit_multi_head_classifier import ViTMultiHeadClassifier
@@ -124,16 +123,20 @@ def main(
 ) -> None:
     accelerator = Accelerator()
 
-    wandb.init(
-        project=config.project_name,
-        name=f"{config.models.name}_{'pretrained' if config.models.pretrained else 'from-scratch'}",
-        config=OmegaConf.to_container(config),  # type: ignore[arg-type]
-        reinit=False if config is None else True,
+    accelerator = Accelerator(log_with="wandb")
+    accelerator.init_trackers(
+        config.project_name,
+        config=OmegaConf.to_container(config),
+        init_kwargs={
+            "wandb": {
+                "name": f"{config.models.name}_{'pretrained' if config.models.pretrained else 'from-scratch'}",
+            }
+        },
     )
 
     pipeline(config, accelerator)
 
-    wandb.finish()
+    accelerator.end_training()
 
 
 if __name__ == "__main__":

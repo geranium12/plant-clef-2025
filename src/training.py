@@ -10,7 +10,6 @@ from omegaconf import DictConfig
 from tqdm import tqdm
 
 import src.augmentation
-import wandb
 from src.data import DataSplit
 from src.data_manager import DataManager
 from src.evaluating import Evaluator
@@ -48,14 +47,11 @@ class Trainer:
         outputs: dict[str, torch.Tensor],
         loss: torch.Tensor,
         prefix: str,
-        epoch: int,
-        iteration: int,
+        step: int,
     ) -> None:
         """Logs loss components to wandb and console."""
         log_data = {
             f"{prefix}/loss": loss.item(),
-            f"{prefix}/epoch": epoch,
-            f"{prefix}/iter": iteration,
         }
 
         print_str = f"{prefix.capitalize()} Loss: {loss.item():.4f}"
@@ -68,7 +64,7 @@ class Trainer:
                     f", Loss {head.capitalize()}: {outputs[loss_key].item():.4f}"
                 )
 
-        wandb.log(log_data)
+        self.accelerator.log(log_data, step=step)
         print(print_str)
 
     def _train_step(
@@ -123,7 +119,12 @@ class Trainer:
                 running_loss += loss.item()
 
                 self._log_loss(
-                    outputs, loss, prefix="train", epoch=epoch, iteration=iteration
+                    outputs,
+                    loss,
+                    prefix="train",
+                    step=iteration * self.accelerator.num_processes
+                    + epoch * len(self.data_manager.train_dataloader)
+                    + self.accelerator.process_index,
                 )
 
                 # Perform validation periodically
@@ -138,7 +139,12 @@ class Trainer:
                     )
 
             avg_epoch_loss = running_loss / len(self.data_manager.train_dataloader)
-            wandb.log({"train/epoch_loss": avg_epoch_loss, "epoch": epoch})
+            self.accelerator.log(
+                {"train/epoch_loss": avg_epoch_loss},
+                step=iteration * self.accelerator.num_processes
+                + epoch * len(self.data_manager.train_dataloader)
+                + self.accelerator.process_index,
+            )
             print(
                 f"Epoch: {epoch + 1}/{self.config.training.epochs}, Avg Training Loss: {avg_epoch_loss:.4f}"
             )
@@ -197,15 +203,15 @@ def train(
         df_metadata=df_metadata,
     )
 
-    (
-        data_manager.train_dataloader,
-        data_manager.val_dataloader,
-        data_manager.test_dataloader,
-    ) = accelerator.prepare(
-        data_manager.train_dataloader,
-        data_manager.val_dataloader,
-        data_manager.test_dataloader,
-    )
+    # (
+    #     data_manager.train_dataloader,
+    #     data_manager.val_dataloader,
+    #     data_manager.test_dataloader,
+    # ) = accelerator.prepare(
+    #     data_manager.train_dataloader,
+    #     data_manager.val_dataloader,
+    #     data_manager.test_dataloader,
+    # )
 
     evaluator = Evaluator(data_manager, model, config, accelerator)
 
