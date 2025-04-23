@@ -6,7 +6,7 @@ from src.data import (
     PlantDataset,
     get_image_paths,
     get_labeled_data_split,
-    get_samples,
+    get_plant_data_image_info,
     get_unlabeled_data_split,
 )
 
@@ -17,8 +17,8 @@ TRAIN_FILE_DIR = (
 
 def test_deterministic_order() -> None:
     # Test to see if multiple calls to get_samples return the same order
-    samples = get_samples(TRAIN_FILE_DIR)
-    samples2 = get_samples(TRAIN_FILE_DIR)
+    samples = get_plant_data_image_info(TRAIN_FILE_DIR)
+    samples2 = get_plant_data_image_info(TRAIN_FILE_DIR)
     assert len(samples) == len(samples2)
     for sample1, sample2 in zip(samples, samples2):
         assert sample1 == sample2
@@ -26,8 +26,11 @@ def test_deterministic_order() -> None:
 
 def test_labeled_data_split_size() -> None:
     # Test to see if the data split sizes are correct and unique
-    total_samples = len(get_samples(TRAIN_FILE_DIR))
-    train_indices, val_indices, test_indices = get_labeled_data_split(TRAIN_FILE_DIR)
+    plant_data_image_info = get_plant_data_image_info(TRAIN_FILE_DIR)
+    total_samples = len(plant_data_image_info)
+    train_indices, val_indices, test_indices = get_labeled_data_split(
+        plant_data_image_info
+    )
     assert len(train_indices) + len(val_indices) + len(test_indices) == total_samples, (
         "Split sizes do not sum to total samples"
     )
@@ -50,7 +53,7 @@ def test_other_deterministic_order() -> None:
 def test_dataset_concatenation() -> None:
     # Test to see if the concatenated dataset returns the correct number of samples
     train_dataset = PlantDataset(
-        image_folder=TRAIN_FILE_DIR,
+        plant_data_image_info=get_plant_data_image_info(TRAIN_FILE_DIR),
         image_size=(400, 400),
         transform=None,
         indices=None,
@@ -81,10 +84,29 @@ def test_dataset_concatenation() -> None:
 
 def test_unlabeled_data_split_size() -> None:
     # Test to see if the data split sizes are correct and unique
-    total_samples = len(get_samples(TRAIN_FILE_DIR))
+    total_samples = len(get_plant_data_image_info(TRAIN_FILE_DIR))
     train_indices, val_indices, test_indices = get_unlabeled_data_split(TRAIN_FILE_DIR)
     assert len(train_indices) + len(val_indices) + len(test_indices) == total_samples, (
         "Split sizes do not sum to total samples"
     )
     unique_indices = set(train_indices + val_indices + test_indices)
     assert len(unique_indices) == total_samples, "Indices are not unique across splits"
+
+
+def test_combine_species_threshold() -> None:
+    # Test to see if combining species with low counts works correctly
+    plant_data_image_info = get_plant_data_image_info(
+        TRAIN_FILE_DIR, combine_classes_threshold=0
+    )
+    assert not any(info.class_name == "0" for info in plant_data_image_info)
+    for threshold in [1, 10]:
+        plant_data_image_info = get_plant_data_image_info(
+            TRAIN_FILE_DIR, combine_classes_threshold=threshold
+        )
+        class_counts: dict[str, int] = {}
+        assert any(info.class_name == "0" for info in plant_data_image_info)
+        for info in plant_data_image_info:
+            class_counts[info.class_name] = class_counts.get(info.class_name, 0) + 1
+        assert all(count > threshold for count in class_counts.values()), (
+            "Some classes have less than 2 samples"
+        )

@@ -26,6 +26,7 @@ data:
     species_mapping: "species_ids.csv"
   other:
     folder: "other/"
+  combine_classes_threshold: 0 # The minimum number of images required for a class the get its own label
 
 models:
   name: "vit_base_patch14_reg4_dinov2.lvd142m"
