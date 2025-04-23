@@ -144,7 +144,6 @@ class DataManager:
         species_labels: torch.Tensor,
         plant_labels: torch.Tensor,
         images_names: list[str],
-        device: torch.device,
     ) -> dict[str, torch.Tensor]:
         """
         Gathers and transforms labels for species, genus, family, and organ
@@ -178,8 +177,8 @@ class DataManager:
             family_ids[i] = family_name_to_id(family_name, self.family_mapping)
             organ_ids[i] = organ_name_to_id(organ_name, self.organ_mapping)
 
-        labels["species"] = new_species_ids.to(device)
-        labels["genus"] = genus_ids.to(device)
-        labels["family"] = family_ids.to(device)
-        labels["organ"] = organ_ids.to(device)
+        labels["species"] = new_species_ids
+        labels["genus"] = genus_ids
+        labels["family"] = family_ids
+        labels["organ"] = organ_ids
         return labels

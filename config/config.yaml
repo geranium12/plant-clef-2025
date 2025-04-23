@@ -65,4 +65,3 @@ image_height: 518
 submission_file: "submission.csv"
 
 seed: 42
-device: "cuda:3"

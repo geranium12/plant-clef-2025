@@ -16,7 +16,6 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore
         num_labels_plant: int = 1,
         num_labels_species: int | None = None,
         freeze_backbone: bool = True,
-        device: torch.device | None = None,
     ) -> None:
         super().__init__()
 
@@ -62,8 +61,6 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore
 
         self.head_names = ["species", "genus", "family", "plant", "organ"]
         self.pretrained_cfg = self.backbone.pretrained_cfg
-        self.device = device if device else torch.device("cpu")
-        self.to(self.device)
 
     @staticmethod
     def _make_classifier(hidden_size: int, num_labels: int) -> nn.Sequential:

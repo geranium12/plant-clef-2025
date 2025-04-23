@@ -1,7 +1,7 @@
 import os
 
 import hydra
-import torch
+from accelerate import Accelerator
 from omegaconf import (
     DictConfig,
     OmegaConf,
@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 import src.data as data
 import wandb
 from src import prediction, submission, training
-from src.utils import load_model, save_model
+from src.utils import load_model
 from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 from utils.build_hierarchies import (
     get_organ_number,
@@ -22,8 +22,10 @@ from utils.build_hierarchies import (
 
 def pipeline(
     config: DictConfig,
-    device: torch.device,
+    accelerator: Accelerator,
 ) -> None:
+    device = accelerator.device
+
     (
         df_metadata,
         df_species_ids,
@@ -60,27 +62,24 @@ def pipeline(
     plant_tree = read_plant_taxonomy(config)
     _, num_labels_genus, num_labels_family = get_plant_tree_number(plant_tree)
 
-    model = load_model(config=config, device=device, df_species_ids=df_species_ids)
+    model = load_model(config=config, df_species_ids=df_species_ids)
     model = ViTMultiHeadClassifier(
         backbone=model,
         num_labels_organ=get_organ_number(df_metadata),
         num_labels_genus=num_labels_genus,
         num_labels_family=num_labels_family,
         num_labels_plant=1,
-        device=device,
     )
     print(model)
 
     model, model_info = training.train(
         model=model,
         config=config,
-        device=device,
         df_metadata=df_metadata,
+        accelerator=accelerator,
         plant_data_split=plant_data_split,
         non_plant_data_split=non_plant_data_split,
     )
-
-    save_model(model, config)
 
     submission_dataloader = DataLoader(
         dataset=data.TestDataset(
@@ -97,13 +96,13 @@ def pipeline(
         num_workers=config.training.num_workers,
         pin_memory=True,
     )
+    submission_dataloader = accelerator.prepare(submission_dataloader)
 
     image_predictions = prediction.predict(
         dataloader=submission_dataloader,
         model=model,
         model_info=model_info,
         batch_size=config.training.batch_size,
-        device=device,
         top_k_tile=config.training.top_k_tile,
         class_map=class_map,
         min_score=config.training.min_score,
@@ -123,6 +122,8 @@ def pipeline(
 def main(
     config: DictConfig,
 ) -> None:
+    accelerator = Accelerator()
+
     wandb.init(
         project=config.project_name,
         name=f"{config.models.name}_{'pretrained' if config.models.pretrained else 'from-scratch'}",
@@ -130,9 +131,7 @@ def main(
         reinit=False if config is None else True,
     )
 
-    device = torch.device(config.device)
-
-    pipeline(config, device)
+    pipeline(config, accelerator)
 
     wandb.finish()
 

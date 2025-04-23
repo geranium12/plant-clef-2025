@@ -41,7 +41,6 @@ def predict(
     model: torch.nn.Module,
     model_info: ModelInfo,
     batch_size: int,
-    device: torch.device,
     top_k_tile: int,
     class_map: dict[int, int],
     min_score: float,
@@ -74,8 +73,6 @@ def predict(
             )
 
             for batch_patches in patch_loader:
-                batch_patches = batch_patches.to(device)
-
                 with autocast("cuda"):
                     outputs = model(batch_patches)  # Perform inference on the batch
                     probabilities = torch.nn.functional.softmax(

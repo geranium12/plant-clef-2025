@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from accelerate import Accelerator
 from omegaconf import DictConfig
 from sklearn.metrics import f1_score, precision_score, recall_score
 from torch.utils.data import DataLoader
@@ -17,18 +18,15 @@ class Evaluator:
         data_manager: DataManager,
         model: nn.Module,
         config: DictConfig,
-        device: torch.device | None = None,
+        accelerator: Accelerator,
     ) -> None:
         """
         Initialize the Evaluator.
-
-        Args:
-            device (torch.device, optional): Device to use for evaluation. Defaults to None.
         """
-        self.device = device if device else torch.device("cpu")
         self.data_manager = data_manager
         self.model = model
         self.config = config
+        self.accelerator = accelerator
 
     @staticmethod
     def get_top_k_predictions(predictions: np.ndarray, k: int) -> np.ndarray:
@@ -73,18 +71,11 @@ class Evaluator:
     ) -> tuple[torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]]:
         """Performs a single evaluation (validation or test) step."""
         images, species_labels, images_names = batch
-        images = images.to(self.device)
-        species_labels = species_labels.to(self.device)
-        plant_labels = (
-            (species_labels != -1)
-            .clone()
-            .detach()
-            .to(dtype=torch.float32, device=self.device)
-        )
+        plant_labels = (species_labels != -1).clone().detach().to(dtype=torch.float32)
 
         # Gather labels
         labels = self.data_manager.gather_all_labels(
-            species_labels, plant_labels, images_names, self.device
+            species_labels, plant_labels, images_names
         )
 
         # Forward pass (no gradients)
@@ -93,7 +84,7 @@ class Evaluator:
                 pixel_values=images, labels=labels, plant_mask=labels["plant"] == 1
             )
             loss = calculate_total_loss(
-                outputs, self.model.head_names, self.config, self.device
+                outputs, self.model.module.head_names, self.config
             )
 
         return loss, outputs, labels
@@ -133,6 +124,8 @@ class Evaluator:
         if not dataloader:
             print(f"Skipping evaluation for {prefix} as dataloader is missing.")
             return {}
+
+        self.model, dataloader = self.accelerator.prepare(self.model, dataloader)
 
         self.model.eval()
         all_preds: dict[str, list[np.ndarray]] = {

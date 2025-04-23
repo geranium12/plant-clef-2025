@@ -5,6 +5,7 @@ import timm
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from accelerate import Accelerator
 from omegaconf import DictConfig
 from tqdm import tqdm
 
@@ -28,13 +29,13 @@ class Trainer:
         self,
         model: nn.Module,
         config: DictConfig,
-        device: torch.device,
         data_manager: DataManager,
+        accelerator: Accelerator,
         evaluator: Evaluator | None = None,
     ):
-        self.model = model.to(device)
+        self.model = model
         self.config = config
-        self.device = device
+        self.accelerator = accelerator
         self.data_manager = data_manager
         self.evaluator = evaluator
         self.optimizer = optim.Adam(
@@ -59,7 +60,7 @@ class Trainer:
 
         print_str = f"{prefix.capitalize()} Loss: {loss.item():.4f}"
 
-        for head in self.model.head_names:
+        for head in self.model.module.head_names:
             loss_key = f"loss_{head}"
             if loss_key in outputs:
                 log_data[f"{prefix}/{loss_key}"] = outputs[loss_key].item()
@@ -75,14 +76,7 @@ class Trainer:
     ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
         """Performs a single training step."""
         images, species_labels, images_names = batch
-        images = images.to(self.device)
-        species_labels = species_labels.to(self.device)
-        plant_labels = (
-            (species_labels != -1)
-            .clone()
-            .detach()
-            .to(dtype=torch.float32, device=self.device)
-        )
+        plant_labels = (species_labels != -1).clone().detach().to(dtype=torch.float32)
 
         # Apply augmentation
         augmentation = src.augmentation.get_random_data_augmentation(self.config)
@@ -90,7 +84,7 @@ class Trainer:
 
         # Gather labels
         labels = self.data_manager.gather_all_labels(
-            species_labels, plant_labels, images_names, self.device
+            species_labels, plant_labels, images_names
         )
 
         # Forward pass
@@ -100,12 +94,10 @@ class Trainer:
         )
 
         # Calculate loss
-        loss = calculate_total_loss(
-            outputs, self.model.head_names, self.config, self.device
-        )
+        loss = calculate_total_loss(outputs, self.model.module.head_names, self.config)
 
         # Backward pass and optimization
-        loss.backward()
+        self.accelerator.backward(loss)
         self.optimizer.step()
 
         return loss, outputs
@@ -113,6 +105,12 @@ class Trainer:
     def train(self) -> tuple[nn.Module, ModelInfo]:
         """Runs the main training loop."""
         self.model.train()
+
+        self.model, self.optimizer, self.data_manager.train_dataloader = (
+            self.accelerator.prepare(
+                self.model, self.optimizer, self.data_manager.train_dataloader
+            )
+        )
 
         for epoch in range(self.config.training.epochs):
             running_loss = 0.0
@@ -171,8 +169,8 @@ class Trainer:
 def train(
     model: nn.Module,
     config: DictConfig,
-    device: torch.device,
     df_metadata: pd.DataFrame,
+    accelerator: Accelerator,
     plant_data_split: DataSplit | None = None,
     non_plant_data_split: DataSplit | None = None,
 ) -> tuple[torch.nn.Module, ModelInfo]:
@@ -182,7 +180,7 @@ def train(
     Args:
         model: The neural network model.
         config: Configuration object (OmegaConf).
-        device: The device to train on (e.g., 'cuda', 'cpu').
+        accelerator: Accelerator object for distributed training.
         df_metadata: DataFrame containing metadata for images.
         plant_data_split: Optional DataSplit object for plant data.
         non_plant_data_split: Optional DataSplit object for non-plant data.
@@ -199,14 +197,24 @@ def train(
         df_metadata=df_metadata,
     )
 
-    evaluator = Evaluator(data_manager, model, config, device)
+    (
+        data_manager.train_dataloader,
+        data_manager.val_dataloader,
+        data_manager.test_dataloader,
+    ) = accelerator.prepare(
+        data_manager.train_dataloader,
+        data_manager.val_dataloader,
+        data_manager.test_dataloader,
+    )
+
+    evaluator = Evaluator(data_manager, model, config, accelerator)
 
     # Initialize trainer
     trainer = Trainer(
         model=model,
         config=config,
-        device=device,
         data_manager=data_manager,
+        accelerator=accelerator,
         evaluator=evaluator if data_manager.val_dataloader else None,
     )
 

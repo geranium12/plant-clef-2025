@@ -7,9 +7,7 @@ import torch.nn as nn
 from omegaconf import DictConfig
 
 
-def load_model(
-    config: DictConfig, device: torch.device, df_species_ids: pd.DataFrame
-) -> nn.Module:
+def load_model(config: DictConfig, df_species_ids: pd.DataFrame) -> nn.Module:
     model = timm.create_model(
         config.models.name,
         pretrained=config.models.pretrained,
@@ -18,31 +16,8 @@ def load_model(
             config.project_path, config.models.folder, config.models.checkpoint_file
         ),
     )
-    model = model.to(device)
     model = model.eval()
     return model
-
-
-def save_model(
-    model: torch.nn.Module,
-    config: DictConfig,
-) -> None:
-    # check if the model folder exists, if not create it
-    os.makedirs(
-        os.path.join(
-            config.project_path,
-            config.models.save_folder,
-        ),
-        exist_ok=True,
-    )
-
-    model_path = os.path.join(
-        config.project_path,
-        config.models.save_folder,
-        config.models.save_file,
-    )
-    torch.save(model.state_dict(), model_path)
-    print(f"Model saved to {model_path}")
 
 
 def species_id_to_name(species_id: int, species_mapping: pd.DataFrame) -> str:
@@ -96,10 +71,9 @@ def calculate_total_loss(
     outputs: dict[str, torch.Tensor],
     head_names: list[str],
     config: DictConfig,
-    device: torch.device,
 ) -> torch.Tensor:
     """Calculates the weighted total loss."""
-    total_loss = torch.tensor(0.0, device=device)
+    total_loss = torch.tensor(0.0, device=outputs[f"loss_{head_names[0]}"].device)
     weights = config.training.loss_weights
     for head in head_names:
         loss_key = f"loss_{head}"
