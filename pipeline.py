@@ -80,6 +80,8 @@ def pipeline(
         non_plant_data_split=non_plant_data_split,
     )
 
+    save_model(model, config)
+
     submission_dataloader = DataLoader(
         dataset=data.TestDataset(
             image_folder=os.path.join(
@@ -112,8 +114,6 @@ def pipeline(
         image_predictions,
     )
 
-    save_model(model, config)
-
 
 @hydra.main(
     version_base=None,
@@ -130,7 +130,7 @@ def main(
         reinit=False if config is None else True,
     )
 
-    device = torch.device("cuda:3")
+    device = torch.device(config.device)
 
     pipeline(config, device)
 
