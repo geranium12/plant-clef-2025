@@ -47,9 +47,7 @@ def test_other_deterministic_order() -> None:
         assert sample1 == sample2
 
 
-# TODO: Fix this test
 def test_dataset_concatenation() -> None:
-    return
     # Test to see if the concatenated dataset returns the correct number of samples
     train_dataset = PlantDataset(
         image_folder=TRAIN_FILE_DIR,
@@ -74,10 +72,11 @@ def test_dataset_concatenation() -> None:
         (concatenated_dataset[-len(concatenated_dataset)], train_dataset[0]),
     ]
     for i, (value1, value2) in enumerate(pairs):
-        image_1, class_1 = value1
-        image_2, class_2 = value2
+        (image_1, class_1, name_1) = value1  # type: ignore
+        (image_2, class_2, name_2) = value2
         assert class_1 == class_2, f"Case {i}"
         assert torch.equal(image_1, image_2), f"Case {i}"
+        assert name_1 == name_2, f"Case {i}"
 
 
 def test_unlabeled_data_split_size() -> None:
