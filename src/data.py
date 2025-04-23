@@ -1,7 +1,7 @@
 import os
 import random
 from dataclasses import astuple, dataclass
-from typing import Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -14,11 +14,14 @@ from kornia.contrib import (
 from omegaconf import (
     DictConfig,
 )
-from PIL import Image
+from PIL import Image, ImageFile
 from sklearn.model_selection import train_test_split
 from torch.utils.data import (
     Dataset,
 )
+from tqdm import tqdm
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class PatchDataset(Dataset):  # type: ignore[misc]
@@ -68,6 +71,7 @@ class TestDataset(Dataset):  # type: ignore[misc]
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, str]:
         image_path = self.image_paths[idx]
         image = Image.open(image_path)
+        image = image.convert("RGB")
 
         if self.transform:
             image = self.transform(image).unsqueeze(0)
@@ -144,13 +148,14 @@ def get_image_paths(image_folder: str) -> list[str]:
     return image_paths
 
 
-class TrainDataset(Dataset):  # type: ignore[misc]
+# This types of dataset has species_id and contains only plants
+class PlantDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
         image_folder: str,
         image_size: tuple[int, int] = (400, 400),
         transform: ttransforms.transforms = None,
-        indices: Optional[list[int]] = None,
+        indices: list[int] | None = None,
     ) -> None:
         self.image_size = image_size
         self.transform = transform if transform is not None else ttransforms.ToTensor()
@@ -165,21 +170,25 @@ class TrainDataset(Dataset):  # type: ignore[misc]
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, str]:
-        cls_name, image_path = self.samples[idx]
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int, str]:
+        species_id, image_path = self.samples[idx]
+        species_id = int(species_id)
         image = Image.open(image_path)
+        image = image.convert("RGB")
         image = image.resize(self.image_size)
         image = self.transform(image)
-        return image, cls_name
+        image_name = os.path.basename(image_path)
+        return (image, species_id, image_name)
 
 
-class UnlabeledDataset(Dataset):  # type: ignore[misc]
+# This types of dataset has no species_id and contains only non-plants
+class NonPlantDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
         image_folder: str,
         image_size: tuple[int, int] = (400, 400),
         transform: ttransforms.transforms = None,
-        indices: Optional[list[int]] = None,
+        indices: list[int] | None = None,
     ) -> None:
         self.image_size = image_size
         self.transform = transform if transform is not None else ttransforms.ToTensor()
@@ -194,12 +203,14 @@ class UnlabeledDataset(Dataset):  # type: ignore[misc]
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, None]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int, str]:
         image_path = self.samples[idx]
         image = Image.open(image_path)
+        image = image.convert("RGB")
         image = image.resize(self.image_size)
         image = self.transform(image)
-        return image, None
+        image_name = os.path.basename(image_path)
+        return (image, -1, image_name)
 
 
 class ConcatenatedDataset(Dataset):  # type: ignore[misc]
@@ -213,7 +224,7 @@ class ConcatenatedDataset(Dataset):  # type: ignore[misc]
     def __len__(self) -> int:
         return int(self.end_indices[-1])
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, Optional[str]]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, str | None]:
         idx = (idx % len(self) + len(self)) % len(self)
         for i, end_idx in enumerate(self.end_indices):
             if idx < end_idx:
@@ -326,6 +337,22 @@ def get_unlabeled_data_split(
     )
 
 
+def read_csv_in_chunks(path: str, **read_params: Any) -> pd.DataFrame:
+    if "chunksize" not in read_params or read_params["chunksize"] < 1:
+        read_params["chunksize"] = 10000
+    chunks = []
+    for _, chunk in enumerate(
+        tqdm(
+            pd.read_csv(path, **read_params),
+            desc="Reading CSV",
+        )
+    ):
+        chunks.append(chunk)
+    concat_df = pd.concat(chunks, axis=0)
+    del chunks
+    return concat_df
+
+
 def load(
     config: DictConfig,
 ) -> tuple[
@@ -337,8 +364,8 @@ def load(
         config.project_path, config.data.folder, config.data.metadata.folder
     )
 
-    df_metadata = pd.read_csv(
-        os.path.join(metadata_path, config.data.metadata.training),
+    df_metadata = read_csv_in_chunks(
+        path=os.path.join(metadata_path, config.data.metadata.training),
         sep=";",
         dtype={"partner": str},
     )

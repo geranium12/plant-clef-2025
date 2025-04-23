@@ -79,7 +79,7 @@ def predict(
                 with autocast("cuda"):
                     outputs = model(batch_patches)  # Perform inference on the batch
                     probabilities = torch.nn.functional.softmax(
-                        outputs,
+                        outputs["logits_species"],
                         dim=1,
                     )
 
@@ -97,19 +97,11 @@ def predict(
                     for (
                         top_tile_indices,
                         top_tile_probs,
-                    ) in zip(
-                        top_indices,
-                        top_probs,
-                        strict=False,
-                    ):
+                    ) in zip(top_indices, top_probs):
                         for (
                             top_idx,
                             top_prob,
-                        ) in zip(
-                            top_tile_indices,
-                            top_tile_probs,
-                            strict=False,
-                        ):
+                        ) in zip(top_tile_indices, top_tile_probs):
                             species_id = class_map[top_idx]
                             # Update the results dictionary only if the probability is higher
                             if top_prob > min_score:

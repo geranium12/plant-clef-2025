@@ -2,6 +2,23 @@ import torchvision.transforms as ttransforms
 from omegaconf import DictConfig
 
 
+def get_random_data_augmentation(config: DictConfig) -> ttransforms.transforms:
+    return ttransforms.Compose(
+        [
+            ttransforms.RandomHorizontalFlip(),
+            ttransforms.RandomVerticalFlip(),
+            ttransforms.RandomRotation(30),
+            ttransforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+            ttransforms.RandomResizedCrop(
+                size=(config.image_width, config.image_height)
+            ),
+            ttransforms.RandomPerspective(distortion_scale=0.5),
+            ttransforms.RandomAdjustSharpness(sharpness_factor=2),
+            ttransforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5)),
+        ]
+    )
+
+
 def get_data_augmentation(config: DictConfig, name: str) -> ttransforms.transforms:
     match name:
         case "Identity":

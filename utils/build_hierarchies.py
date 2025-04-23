@@ -1,5 +1,5 @@
-import json
 import os
+import pickle
 
 import hydra
 import pandas as pd
@@ -53,28 +53,13 @@ def build_plant_taxonomy(
     for node in plant_tree.all_nodes()[:10]:  # Show first 10 nodes
         print(f"{'  ' * plant_tree.depth(node)}- {node.tag}")
 
-    # Convert the tree to a dictionary and then to JSON
-    tree_dict = plant_tree.to_dict(with_data=True)
-    json_string = json.dumps(tree_dict, indent=4)
+    # Save the tree as a Pickle file
+    folder_path = check_utils_folder(config)
 
-    # Save the JSON string to a file
-    folder_path = os.path.join(
-        config.project_path,
-        config.data.folder,
-        config.data.utils.folder,
-    )
-    os.makedirs(
-        folder_path,
-        exist_ok=True,
-    )
     with open(
-        os.path.join(
-            folder_path,
-            config.data.utils.plant_taxonomy_file,
-        ),
-        "w",
-    ) as json_file:
-        json_file.write(json_string)
+        os.path.join(folder_path, config.data.utils.plant_taxonomy_file), "wb"
+    ) as file:
+        pickle.dump(plant_tree, file)
 
 
 def read_plant_taxonomy(config: DictConfig) -> Tree:
@@ -85,15 +70,30 @@ def read_plant_taxonomy(config: DictConfig) -> Tree:
             config.data.utils.folder,
             config.data.utils.plant_taxonomy_file,
         ),
-    ) as json_file:
-        tree_dict = json.load(json_file)
-
-    plant_tree = Tree()
-    plant_tree.from_dict(tree_dict)
-    return plant_tree
+        "rb",
+    ) as file:
+        return pickle.load(file)
 
 
-def print_organ_distribution(df_metadata: pd.DataFrame) -> None:
+def get_genus_family_from_species(plant_tree: Tree, species: str) -> tuple[str, str]:
+    # Find the species node
+    species_node = plant_tree.get_node(species)
+    if species_node is None:
+        raise ValueError(f"Species '{species}' not found in taxonomy tree")
+
+    # Get the parent (genus) and grandparent (family) nodes
+    genus_node = plant_tree.parent(species)
+    if genus_node is None:
+        raise ValueError(f"Genus not found for species '{species}'")
+
+    family_node = plant_tree.parent(genus_node.identifier)
+    if family_node is None:
+        raise ValueError(f"Family not found for species '{species}'")
+
+    return genus_node.identifier, family_node.identifier
+
+
+def get_organ_number(df_metadata: pd.DataFrame) -> int:
     # Check if any species has multiple organs
     species_organs = df_metadata.groupby("species")["organ"].nunique()
     organ_counts = species_organs.value_counts().sort_index()
@@ -103,6 +103,28 @@ def print_organ_distribution(df_metadata: pd.DataFrame) -> None:
         print(
             f"  - {count} species have {num_organs} organ{'s' if num_organs > 1 else ''}"
         )
+
+    return len(organ_counts)
+
+
+def get_plant_tree_number(plant_tree: Tree) -> tuple[int, int, int]:
+    # Get all nodes at each level
+    species_nodes = [
+        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 3
+    ]
+    genus_nodes = [
+        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 2
+    ]
+    family_nodes = [
+        node for node in plant_tree.all_nodes() if plant_tree.depth(node) == 1
+    ]
+
+    print("\nTaxonomy statistics:")
+    print(f"  - Number of species: {len(species_nodes)}")
+    print(f"  - Number of genera: {len(genus_nodes)}")
+    print(f"  - Number of families: {len(family_nodes)}")
+
+    return len(species_nodes), len(genus_nodes), len(family_nodes)
 
 
 # organ -> species
@@ -135,15 +157,7 @@ def build_organ_hierarchy(config: DictConfig, df_metadata: pd.DataFrame) -> None
     print(organ_hierarchy_df.head())
 
     # Save the DataFrame to a csv file
-    folder_path = os.path.join(
-        config.project_path,
-        config.data.folder,
-        config.data.utils.folder,
-    )
-    os.makedirs(
-        folder_path,
-        exist_ok=True,
-    )
+    folder_path = check_utils_folder(config)
     organ_hierarchy_df.to_csv(
         os.path.join(
             folder_path,
@@ -165,9 +179,97 @@ def read_organ_hierarchy(config: DictConfig) -> pd.DataFrame:
     return species_organs_df
 
 
+def map_species_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
+    species_ids = df_metadata["species_id"].unique()
+    new_species_ids = range(len(species_ids))
+    species_mapping = pd.DataFrame(
+        {
+            "species_id": species_ids,
+            "species_name": [
+                df_metadata[df_metadata["species_id"] == sid]["species"].iloc[0]
+                for sid in species_ids
+            ],
+            "new_species_id": new_species_ids,
+        }
+    )
+
+    folder_path = check_utils_folder(config)
+
+    species_mapping.to_csv(
+        os.path.join(
+            folder_path,
+            config.data.utils.species_mapping,
+        ),
+        index=False,
+    )
+
+
+def map_genus_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
+    genus_names = df_metadata["genus"].unique()
+    genus_ids = range(len(genus_names))
+    genus_mapping = pd.DataFrame({"genus_name": genus_names, "genus_id": genus_ids})
+
+    folder_path = check_utils_folder(config)
+
+    genus_mapping.to_csv(
+        os.path.join(
+            folder_path,
+            config.data.utils.genus_mapping,
+        ),
+        index=False,
+    )
+
+
+def map_family_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
+    family_names = df_metadata["family"].unique()
+    family_ids = range(len(family_names))
+    family_mapping = pd.DataFrame(
+        {"family_name": family_names, "family_id": family_ids}
+    )
+
+    folder_path = check_utils_folder(config)
+
+    family_mapping.to_csv(
+        os.path.join(
+            folder_path,
+            config.data.utils.family_mapping,
+        ),
+        index=False,
+    )
+
+
+def map_organ_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
+    organ_names = df_metadata["organ"].unique()
+    organ_ids = range(len(organ_names))
+    organ_mapping = pd.DataFrame({"organ_name": organ_names, "organ_id": organ_ids})
+
+    folder_path = check_utils_folder(config)
+
+    organ_mapping.to_csv(
+        os.path.join(
+            folder_path,
+            config.data.utils.organ_mapping,
+        ),
+        index=False,
+    )
+
+
+def check_utils_folder(config: DictConfig) -> str:
+    folder_path = os.path.join(
+        config.project_path,
+        config.data.folder,
+        config.data.utils.folder,
+    )
+    os.makedirs(
+        folder_path,
+        exist_ok=True,
+    )
+    return str(folder_path)
+
+
 @hydra.main(
     version_base=None,
-    config_path="config",
+    config_path="../config",
     config_name="config",
 )
 def main(
@@ -176,11 +278,12 @@ def main(
     # Read the CSV file
     df_metadata, _, _ = data.load(config)
 
-    # Print how many organs has each species in the training dataset
-    print_organ_distribution(df_metadata)
+    map_species_str_to_id(config, df_metadata)
+    map_genus_str_to_id(config, df_metadata)
+    map_family_str_to_id(config, df_metadata)
+    map_organ_str_to_id(config, df_metadata)
 
     build_plant_taxonomy(config, df_metadata)
-
     build_organ_hierarchy(config, df_metadata)
 
 

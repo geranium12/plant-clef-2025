@@ -18,8 +18,12 @@ data:
   test_images_folder: "PlantCLEF2025_test_images/PlantCLEF2025_test_images/"
   utils:
     folder: "utils/"
-    plant_taxonomy_file: "plant_taxonomy.json"
+    plant_taxonomy_file: "plant_taxonomy.pkl"
     organ_hierarchy_file: "organ_hierarchy.csv"
+    genus_mapping: "genus_ids.csv"
+    family_mapping: "family_ids.csv"
+    organ_mapping: "organ_ids.csv"
+    species_mapping: "species_ids.csv"
   other:
     folder: "other/"
 
@@ -28,29 +32,37 @@ models:
   pretrained: false
   folder: "models/"
   checkpoint_file: "model_onlyclassifier_then_all/model_best.pth.tar"
+  save_folder: "5heads_all_labels_vit_base_patch14_reg4_dinov2.lvd142m"
+  save_file: "model_best1.pth.tar"
 
 training:
   use_all_data: false # if true, use all data for training
-  val_size: 0.2
+  val_size: 0.05
   test_size: 0.1
-  augmentations: [
-    "Identity",
-    "FlipHorizontal",
-    "FlipVertical",
-    "Rotate",
-    "Jitter",
-    "ResizeCrop",
-    "Perspective",
-    "Sharpness",
-    "GaussianBlur",
-  ]
-  batch_size: 32
-  shuffle: false
+  batch_size: 144
+  shuffle: True
   num_workers: 1
+  min_score: 0.1
+  top_k_tile: 2
+  lr: 1e-4
+  epochs: 1
+  loss_weights:
+    species: 1.0
+    genus: 1.0
+    family: 1.0
+    plant: 1.0
+    organ: 1.0
 
-image_width: 400
-image_height: 400
+evaluating:
+  every: 1000
+  batch_size: 144
+  shuffle: True
+  num_workers: 8
+
+image_width: 518
+image_height: 518
 
 submission_file: "submission.csv"
 
 seed: 42
+device: "cuda:3"

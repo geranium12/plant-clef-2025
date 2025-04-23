@@ -6,17 +6,17 @@ from omegaconf import (
     DictConfig,
     OmegaConf,
 )
-from torch.utils.data import (
-    DataLoader,
-)
+from torch.utils.data import DataLoader
 
 import src.data as data
-import src.prediction as prediction
-import src.submission as submission
-import src.training as training
 import wandb
-from src.data import (
-    TestDataset,
+from src import prediction, submission, training
+from src.utils import load_model, save_model
+from src.vit_multi_head_classifier import ViTMultiHeadClassifier
+from utils.build_hierarchies import (
+    get_organ_number,
+    get_plant_tree_number,
+    read_plant_taxonomy,
 )
 
 
@@ -30,7 +30,7 @@ def pipeline(
         class_map,
     ) = data.load(config)
 
-    labeled_data_split = (
+    plant_data_split = (
         None
         if config.training.use_all_data
         else data.get_labeled_data_split(
@@ -43,7 +43,7 @@ def pipeline(
             config.training.test_size,
         )
     )
-    unlabeled_data_split = (
+    non_plant_data_split = (
         None
         if config.training.use_all_data
         else data.get_unlabeled_data_split(
@@ -57,20 +57,33 @@ def pipeline(
         )
     )
 
+    plant_tree = read_plant_taxonomy(config)
+    _, num_labels_genus, num_labels_family = get_plant_tree_number(plant_tree)
+
+    model = load_model(config=config, device=device, df_species_ids=df_species_ids)
+    model = ViTMultiHeadClassifier(
+        backbone=model,
+        num_labels_organ=get_organ_number(df_metadata),
+        num_labels_genus=num_labels_genus,
+        num_labels_family=num_labels_family,
+        num_labels_plant=1,
+        device=device,
+    )
+    print(model)
+
     model, model_info = training.train(
+        model=model,
         config=config,
         device=device,
-        df_species_ids=df_species_ids,
-        labeled_data_split=labeled_data_split,
-        unlabeled_data_split=unlabeled_data_split,
+        df_metadata=df_metadata,
+        plant_data_split=plant_data_split,
+        non_plant_data_split=non_plant_data_split,
     )
 
-    batch_size = 64
-    min_score = 0.1
-    top_k_tile = 2
+    save_model(model, config)
 
-    dataloader = DataLoader(
-        dataset=TestDataset(
+    submission_dataloader = DataLoader(
+        dataset=data.TestDataset(
             image_folder=os.path.join(
                 config.project_path,
                 config.data.folder,
@@ -80,20 +93,20 @@ def pipeline(
             stride=int(model_info.input_size / 2),
             use_pad=True,
         ),
-        batch_size=1,
-        num_workers=4,
+        batch_size=1,  # config.training.batch_size, TODO: FIX
+        num_workers=config.training.num_workers,
         pin_memory=True,
     )
 
     image_predictions = prediction.predict(
-        dataloader=dataloader,
+        dataloader=submission_dataloader,
         model=model,
         model_info=model_info,
-        batch_size=batch_size,
+        batch_size=config.training.batch_size,
         device=device,
-        top_k_tile=top_k_tile,
+        top_k_tile=config.training.top_k_tile,
         class_map=class_map,
-        min_score=min_score,
+        min_score=config.training.min_score,
     )
 
     submission.submit(
@@ -117,7 +130,7 @@ def main(
         reinit=False if config is None else True,
     )
 
-    device = torch.device("cuda")
+    device = torch.device(config.device)
 
     pipeline(config, device)
 

@@ -2,8 +2,8 @@ import torch
 
 from src.data import (
     ConcatenatedDataset,
-    TrainDataset,
-    UnlabeledDataset,
+    NonPlantDataset,
+    PlantDataset,
     get_image_paths,
     get_labeled_data_split,
     get_samples,
@@ -49,13 +49,13 @@ def test_other_deterministic_order() -> None:
 
 def test_dataset_concatenation() -> None:
     # Test to see if the concatenated dataset returns the correct number of samples
-    train_dataset = TrainDataset(
+    train_dataset = PlantDataset(
         image_folder=TRAIN_FILE_DIR,
         image_size=(400, 400),
         transform=None,
         indices=None,
     )
-    unlabeled_dataset = UnlabeledDataset(
+    unlabeled_dataset = NonPlantDataset(
         image_folder=OTHER_TRAIN_FILE_DIR,
         image_size=(400, 400),
         transform=None,
@@ -72,10 +72,11 @@ def test_dataset_concatenation() -> None:
         (concatenated_dataset[-len(concatenated_dataset)], train_dataset[0]),
     ]
     for i, (value1, value2) in enumerate(pairs):
-        image_1, class_1 = value1
-        image_2, class_2 = value2
+        (image_1, class_1, name_1) = value1  # type: ignore
+        (image_2, class_2, name_2) = value2
         assert class_1 == class_2, f"Case {i}"
         assert torch.equal(image_1, image_2), f"Case {i}"
+        assert name_1 == name_2, f"Case {i}"
 
 
 def test_unlabeled_data_split_size() -> None:
