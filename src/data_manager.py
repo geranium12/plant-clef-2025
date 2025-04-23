@@ -6,7 +6,13 @@ import torch
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader, Dataset
 
-from src.data import ConcatenatedDataset, DataSplit, NonPlantDataset, PlantDataset
+from src.data import (
+    ConcatenatedDataset,
+    DataSplit,
+    ImageSampleInfo,
+    NonPlantDataset,
+    PlantDataset,
+)
 from src.utils import (
     family_name_to_id,
     genus_name_to_id,
@@ -25,6 +31,7 @@ from utils.build_hierarchies import (
 @dataclass
 class DataManager:
     config: DictConfig
+    plant_data_image_info: list[ImageSampleInfo]
     plant_data_split: DataSplit | None
     non_plant_data_split: DataSplit | None
     df_metadata: pd.DataFrame
@@ -78,7 +85,7 @@ class DataManager:
         ):  # Always include plants for training if no split provided
             datasets_to_concat.append(
                 PlantDataset(
-                    image_folder=image_folder_train,
+                    plant_data_image_info=self.plant_data_image_info,
                     image_size=image_size,
                     indices=plant_indices,
                 )

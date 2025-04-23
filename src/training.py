@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 import src.augmentation
 import wandb
-from src.data import DataSplit
+from src.data import DataSplit, ImageSampleInfo
 from src.data_manager import DataManager
 from src.evaluating import Evaluator
 from src.utils import calculate_total_loss
@@ -173,6 +173,7 @@ def train(
     config: DictConfig,
     device: torch.device,
     df_metadata: pd.DataFrame,
+    plant_data_image_info: list[ImageSampleInfo],
     plant_data_split: DataSplit | None = None,
     non_plant_data_split: DataSplit | None = None,
 ) -> tuple[torch.nn.Module, ModelInfo]:
@@ -194,6 +195,7 @@ def train(
     # Initialize data management
     data_manager = DataManager(
         config=config,
+        plant_data_image_info=plant_data_image_info,
         plant_data_split=plant_data_split,
         non_plant_data_split=non_plant_data_split,
         df_metadata=df_metadata,

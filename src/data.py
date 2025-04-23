@@ -115,7 +115,22 @@ class ImageSampleInfo:
         return iter(astuple(self))
 
 
-def get_samples(image_folder: str) -> list[ImageSampleInfo]:
+def _combine_rare_classes(samples: list[ImageSampleInfo], threshold: int) -> None:
+    if threshold <= 0:
+        return
+
+    counts: dict[str, int] = {}
+    for sample in samples:
+        counts[sample.class_name] = counts.get(sample.class_name, 0) + 1
+
+    for sample in samples:
+        if counts.get(sample.class_name, 0) <= threshold:
+            sample.class_name = "0"
+
+
+def get_plant_data_image_info(
+    image_folder: str, combine_classes_threshold: int = 0
+) -> list[ImageSampleInfo]:
     valid_extensions = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
     samples: list[ImageSampleInfo] = []  # List of (class_name, image_path) pairs.
     for cls in sorted(os.listdir(image_folder)):
@@ -127,6 +142,9 @@ def get_samples(image_folder: str) -> list[ImageSampleInfo]:
                 if file.lower().endswith(valid_extensions):
                     path = os.path.join(root, file)
                     samples.append(ImageSampleInfo(class_name=cls, image_path=path))
+
+    _combine_rare_classes(samples, combine_classes_threshold)
+
     return samples
 
 
@@ -152,7 +170,7 @@ def get_image_paths(image_folder: str) -> list[str]:
 class PlantDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
-        image_folder: str,
+        plant_data_image_info: list[ImageSampleInfo],
         image_size: tuple[int, int] = (400, 400),
         transform: ttransforms.transforms = None,
         indices: list[int] | None = None,
@@ -160,7 +178,7 @@ class PlantDataset(Dataset):  # type: ignore[misc]
         self.image_size = image_size
         self.transform = transform if transform is not None else ttransforms.ToTensor()
 
-        self.samples = get_samples(image_folder)
+        self.samples = plant_data_image_info
         if indices is not None:
             assert all(i < len(self.samples) for i in indices), (
                 "All indices must be less than the number of samples."
@@ -244,7 +262,7 @@ class DataSplit:
         return iter(astuple(self))
 
 
-def get_labeled_data_split(
+def get_unlabeled_data_split(
     image_folder: str, val_size: float = 0.2, test_size: float = 0.1
 ) -> DataSplit:
     """Generates split indices for training, validation, and test sets.
@@ -279,8 +297,10 @@ def get_labeled_data_split(
     )
 
 
-def get_unlabeled_data_split(
-    image_folder: str, val_size: float = 0.2, test_size: float = 0.1
+def get_labeled_data_split(
+    plant_data_image_info: list[ImageSampleInfo],
+    val_size: float = 0.2,
+    test_size: float = 0.1,
 ) -> DataSplit:
     """Generates split indices for training, validation, and test sets.
 
@@ -290,8 +310,7 @@ def get_unlabeled_data_split(
     Returns:
         DataSplit: The train, validation, and test indices.
     """
-    samples = get_samples(image_folder)
-    indices = list(range(len(samples)))
+    indices = list(range(len(plant_data_image_info)))
     assert val_size + test_size < 1.0, (
         "Validation and test sizes must sum to less than 1.0"
     )
@@ -299,12 +318,14 @@ def get_unlabeled_data_split(
     # A lot of classes have only one image, so we need to treat those differently
     # We also treat those with 2 images differently, since we want three splits
     class_counts: dict[str, int] = {}
-    for class_name, _ in samples:
+    for class_name, _ in plant_data_image_info:
         class_counts[class_name] = class_counts.get(class_name, 0) + 1
 
-    few_image_indices = [i for i in indices if class_counts[samples[i].class_name] < 3]
+    few_image_indices = [
+        i for i in indices if class_counts[plant_data_image_info[i].class_name] < 3
+    ]
     multi_image_indices = [
-        i for i in indices if class_counts[samples[i].class_name] >= 3
+        i for i in indices if class_counts[plant_data_image_info[i].class_name] >= 3
     ]
 
     # FIXME: There is a small chance, that for a class with 3 images, 2 are put into val and 1 remains in train_test. In this case an exception will be thrown. I don't want to implement stratified though...
@@ -312,13 +333,13 @@ def get_unlabeled_data_split(
         multi_image_indices,
         test_size=val_size,
         random_state=42,
-        stratify=[samples[i].class_name for i in multi_image_indices],
+        stratify=[plant_data_image_info[i].class_name for i in multi_image_indices],
     )
     train_indices, test_indices = train_test_split(
         train_test_indices,
         test_size=test_size / (1.0 - val_size),
         random_state=42,
-        stratify=[samples[i].class_name for i in train_test_indices],
+        stratify=[plant_data_image_info[i].class_name for i in train_test_indices],
     )
 
     for i in few_image_indices:

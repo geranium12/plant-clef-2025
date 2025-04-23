@@ -30,17 +30,22 @@ def pipeline(
         class_map,
     ) = data.load(config)
 
+    plant_data_image_info = data.get_plant_data_image_info(
+        os.path.join(
+            config.project_path,
+            config.data.folder,
+            config.data.train_folder,
+        ),
+        combine_classes_threshold=config.data.combine_classes_threshold,
+    )
+
     plant_data_split = (
         None
         if config.training.use_all_data
         else data.get_labeled_data_split(
-            os.path.join(
-                config.project_path,
-                config.data.folder,
-                config.data.train_folder,
-            ),
-            config.training.val_size,
-            config.training.test_size,
+            plant_data_image_info=plant_data_image_info,
+            val_size=config.training.val_size,
+            test_size=config.training.test_size,
         )
     )
     non_plant_data_split = (
@@ -76,6 +81,7 @@ def pipeline(
         config=config,
         device=device,
         df_metadata=df_metadata,
+        plant_data_image_info=plant_data_image_info,
         plant_data_split=plant_data_split,
         non_plant_data_split=non_plant_data_split,
     )
