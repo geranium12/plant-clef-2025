@@ -241,17 +241,17 @@ def train(
     )
     accelerator.print(f"Model saved to {save_path}")
 
-    # # Run final evaluation on the test set
-    # accelerator.print("Starting testing...")
-    # test_results = evaluator.evaluate_on_dataloader(
-    #     dataloader=data_manager.test_dataloader,
-    #     prefix="test",
-    #     epoch=0,
-    # )
-    # accelerator.print("Testing finished.")
-    # accelerator.print("Final Test Results:")
-    # for key, value in test_results.items():
-    #     accelerator.print(f"- {key}: {value:.4f}")
+    # Run final evaluation on the test set
+    accelerator.print("Starting testing...")
+    test_results = evaluator.evaluate_on_dataloader(
+        dataloader=data_manager.test_dataloader,
+        prefix="test",
+        epoch=0,
+    )
+    accelerator.print("Testing finished.")
+    accelerator.print("Final Test Results:")
+    for key, value in test_results.items():
+        accelerator.print(f"- {key}: {value:.4f}")
 
     data_config = timm.data.resolve_model_data_config(unwrapped_model)
     model_info = ModelInfo(
