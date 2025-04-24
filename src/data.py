@@ -373,7 +373,7 @@ def read_csv_in_chunks(path: str, **read_params: Any) -> pd.DataFrame:
     return concat_df
 
 
-def load(
+def load_metadata(
     config: DictConfig,
 ) -> pd.DataFrame:
     metadata_path = os.path.join(
