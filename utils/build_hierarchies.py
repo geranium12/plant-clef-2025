@@ -279,7 +279,7 @@ def main(
     config: DictConfig,
 ) -> None:
     # Read the CSV file
-    df_metadata = data.load(config)
+    df_metadata = data.load_metadata(config)
 
     map_species_str_to_id(config, df_metadata)
     map_genus_str_to_id(config, df_metadata)

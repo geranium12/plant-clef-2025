@@ -25,7 +25,7 @@ def pipeline(
     config: DictConfig,
     device: torch.device,
 ) -> None:
-    df_metadata = data.load(config)
+    df_metadata = data.load_metadata(config)
 
     plant_data_image_info = data.get_plant_data_image_info(
         os.path.join(
