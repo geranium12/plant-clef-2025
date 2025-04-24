@@ -19,7 +19,6 @@ from src.utils import (
     image_path_to_organ_name,
     organ_name_to_id,
     species_id_to_name,
-    species_name_to_new_id,
 )
 from utils.build_hierarchies import (
     check_utils_folder,
@@ -35,6 +34,7 @@ class DataManager:
     plant_data_split: DataSplit | None
     non_plant_data_split: DataSplit | None
     df_metadata: pd.DataFrame
+    species_id_to_idx: dict[int, int]
 
     def __post_init__(self) -> None:
         self._load_mappings_and_taxonomy()
@@ -67,11 +67,6 @@ class DataManager:
             else None
         )
 
-        image_folder_train = os.path.join(
-            self.config.project_path,
-            self.config.data.folder,
-            self.config.data.train_folder,
-        )
         image_folder_other = os.path.join(
             self.config.project_path,
             self.config.data.folder,
@@ -148,7 +143,7 @@ class DataManager:
 
     def gather_all_labels(
         self,
-        species_labels: torch.Tensor,
+        species_ids: torch.Tensor,
         plant_labels: torch.Tensor,
         images_names: list[str],
         device: torch.device,
@@ -158,19 +153,19 @@ class DataManager:
         based on the initial species and plant labels.
         """
         labels = {"plant": plant_labels}
-        batch_size = len(species_labels)
-        new_species_ids = torch.full((batch_size,), -1, dtype=torch.long)
+        batch_size = len(species_ids)
+        species_indices = torch.full((batch_size,), -1, dtype=torch.long)
         genus_ids = torch.full((batch_size,), -1, dtype=torch.long)
         family_ids = torch.full((batch_size,), -1, dtype=torch.long)
         organ_ids = torch.full((batch_size,), -1, dtype=torch.long)
 
         # Process only plant samples (where species_id != -1)
-        plant_mask = species_labels != -1
+        plant_mask = species_ids != -1
         plant_indices = torch.where(plant_mask)[0]
 
         for idx in plant_indices:
             i = idx.item()  # Get the actual index in the batch
-            species_id = species_labels[i].item()
+            species_id = species_ids[i].item()
             species_name = species_id_to_name(species_id, self.species_mapping)
             genus_name, family_name = get_genus_family_from_species(
                 self.plant_tree, species_name
@@ -178,14 +173,12 @@ class DataManager:
             image_name = images_names[i]
             organ_name = image_path_to_organ_name(image_name, self.df_metadata)
 
-            new_species_ids[i] = species_name_to_new_id(
-                species_name, self.species_mapping
-            )
+            species_indices[i] = self.species_id_to_idx[species_id]
             genus_ids[i] = genus_name_to_id(genus_name, self.genus_mapping)
             family_ids[i] = family_name_to_id(family_name, self.family_mapping)
             organ_ids[i] = organ_name_to_id(organ_name, self.organ_mapping)
 
-        labels["species"] = new_species_ids.to(device)
+        labels["species"] = species_indices.to(device)
         labels["genus"] = genus_ids.to(device)
         labels["family"] = family_ids.to(device)
         labels["organ"] = organ_ids.to(device)

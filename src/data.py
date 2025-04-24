@@ -108,24 +108,21 @@ class TestDataset(Dataset):  # type: ignore[misc]
 
 @dataclass
 class ImageSampleInfo:
-    class_name: str
+    species_id: int
     image_path: str
-
-    def __iter__(self):  # type: ignore[no-untyped-def]
-        return iter(astuple(self))
 
 
 def _combine_rare_classes(samples: list[ImageSampleInfo], threshold: int) -> None:
     if threshold <= 0:
         return
 
-    counts: dict[str, int] = {}
+    counts: dict[int, int] = {}
     for sample in samples:
-        counts[sample.class_name] = counts.get(sample.class_name, 0) + 1
+        counts[sample.species_id] = counts.get(sample.species_id, 0) + 1
 
     for sample in samples:
-        if counts.get(sample.class_name, 0) <= threshold:
-            sample.class_name = "0"
+        if counts.get(sample.species_id, 0) <= threshold:
+            sample.species_id = 0
 
 
 def get_plant_data_image_info(
@@ -141,7 +138,9 @@ def get_plant_data_image_info(
             for file in files:
                 if file.lower().endswith(valid_extensions):
                     path = os.path.join(root, file)
-                    samples.append(ImageSampleInfo(class_name=cls, image_path=path))
+                    samples.append(
+                        ImageSampleInfo(species_id=int(cls), image_path=path)
+                    )
 
     _combine_rare_classes(samples, combine_classes_threshold)
 
@@ -189,14 +188,14 @@ class PlantDataset(Dataset):  # type: ignore[misc]
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int, str]:
-        species_id, image_path = self.samples[idx]
-        species_id = int(species_id)
+        sample = self.samples[idx]
+        image_path = sample.image_path
         image = Image.open(image_path)
         image = image.convert("RGB")
         image = image.resize(self.image_size)
         image = self.transform(image)
         image_name = os.path.basename(image_path)
-        return (image, species_id, image_name)
+        return (image, sample.species_id, image_name)
 
 
 # This types of dataset has no species_id and contains only non-plants
@@ -317,15 +316,15 @@ def get_labeled_data_split(
 
     # A lot of classes have only one image, so we need to treat those differently
     # We also treat those with 2 images differently, since we want three splits
-    class_counts: dict[str, int] = {}
-    for class_name, _ in plant_data_image_info:
-        class_counts[class_name] = class_counts.get(class_name, 0) + 1
+    class_counts: dict[int, int] = {}
+    for info in plant_data_image_info:
+        class_counts[info.species_id] = class_counts.get(info.species_id, 0) + 1
 
     few_image_indices = [
-        i for i in indices if class_counts[plant_data_image_info[i].class_name] < 3
+        i for i in indices if class_counts[plant_data_image_info[i].species_id] < 3
     ]
     multi_image_indices = [
-        i for i in indices if class_counts[plant_data_image_info[i].class_name] >= 3
+        i for i in indices if class_counts[plant_data_image_info[i].species_id] >= 3
     ]
 
     # FIXME: There is a small chance, that for a class with 3 images, 2 are put into val and 1 remains in train_test. In this case an exception will be thrown. I don't want to implement stratified though...
@@ -333,13 +332,13 @@ def get_labeled_data_split(
         multi_image_indices,
         test_size=val_size,
         random_state=42,
-        stratify=[plant_data_image_info[i].class_name for i in multi_image_indices],
+        stratify=[plant_data_image_info[i].species_id for i in multi_image_indices],
     )
     train_indices, test_indices = train_test_split(
         train_test_indices,
         test_size=test_size / (1.0 - val_size),
         random_state=42,
-        stratify=[plant_data_image_info[i].class_name for i in train_test_indices],
+        stratify=[plant_data_image_info[i].species_id for i in train_test_indices],
     )
 
     for i in few_image_indices:

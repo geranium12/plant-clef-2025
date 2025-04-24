@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 import src.data as data
 import wandb
 from src import prediction, submission, training
+from src.data_manager import DataManager
 from src.utils import load_model, save_model
 from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 from utils.build_hierarchies import (
@@ -65,6 +66,13 @@ def pipeline(
     plant_tree = read_plant_taxonomy(config)
     _, num_labels_genus, num_labels_family = get_plant_tree_number(plant_tree)
 
+    species_id_to_index = {
+        sid: idx
+        for idx, sid in enumerate(
+            sorted({info.species_id for info in plant_data_image_info})
+        )
+    }
+
     model = load_model(config=config, device=device, df_species_ids=df_species_ids)
     model = ViTMultiHeadClassifier(
         backbone=model,
@@ -72,18 +80,26 @@ def pipeline(
         num_labels_genus=num_labels_genus,
         num_labels_family=num_labels_family,
         num_labels_plant=1,
+        num_labels_species=len(species_id_to_index),
         device=device,
     )
     print(model)
 
-    model, model_info = training.train(
-        model=model,
+    # Initialize data management
+    data_manager = DataManager(
         config=config,
-        device=device,
-        df_metadata=df_metadata,
         plant_data_image_info=plant_data_image_info,
         plant_data_split=plant_data_split,
         non_plant_data_split=non_plant_data_split,
+        df_metadata=df_metadata,
+        species_id_to_idx=species_id_to_index,
+    )
+
+    model, model_info = training.train(
+        model=model,
+        data_manager=data_manager,
+        config=config,
+        device=device,
     )
 
     save_model(model, config)
