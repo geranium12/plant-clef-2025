@@ -98,15 +98,15 @@ def test_combine_species_threshold() -> None:
     plant_data_image_info = get_plant_data_image_info(
         TRAIN_FILE_DIR, combine_classes_threshold=0
     )
-    assert not any(info.class_name == "0" for info in plant_data_image_info)
+    assert not any(info.species_id == 0 for info in plant_data_image_info)
     for threshold in [1, 10]:
         plant_data_image_info = get_plant_data_image_info(
             TRAIN_FILE_DIR, combine_classes_threshold=threshold
         )
-        class_counts: dict[str, int] = {}
-        assert any(info.class_name == "0" for info in plant_data_image_info)
+        class_counts: dict[int, int] = {}
+        assert any(info.species_id == 0 for info in plant_data_image_info)
         for info in plant_data_image_info:
-            class_counts[info.class_name] = class_counts.get(info.class_name, 0) + 1
+            class_counts[info.species_id] = class_counts.get(info.species_id, 0) + 1
         assert all(count > threshold for count in class_counts.values()), (
             "Some classes have less than 2 samples"
         )

@@ -52,14 +52,6 @@ def species_id_to_name(species_id: int, species_mapping: pd.DataFrame) -> str:
     return str(species_row["species_name"].iloc[0])
 
 
-def species_name_to_new_id(species_name: str, species_mapping: pd.DataFrame) -> int:
-    species_row = species_mapping[species_mapping["species_name"] == species_name]
-    if species_row.empty:
-        raise ValueError(f"Species name '{species_name}' not found in mapping")
-
-    return int(species_row["new_species_id"].iloc[0])
-
-
 def genus_name_to_id(genus_name: str, genus_mapping: pd.DataFrame) -> int:
     genus_row = genus_mapping[genus_mapping["genus_name"] == genus_name]
     if genus_row.empty:

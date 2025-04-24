@@ -181,10 +181,9 @@ def read_organ_hierarchy(config: DictConfig) -> pd.DataFrame:
 
 
 def map_species_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
-    species_ids = df_metadata["species_id"].unique()
+    species_ids = df_metadata["species_id"].sort_values().unique()
     assert 0 not in species_ids  # We want to use 0 for all not listed species
     species_ids = np.insert(species_ids, 0, 0)
-    new_species_ids = range(len(species_ids))
     species_mapping = pd.DataFrame(
         {
             "species_id": species_ids,
@@ -194,7 +193,6 @@ def map_species_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None
                 else "other species"
                 for sid in species_ids
             ],
-            "new_species_id": new_species_ids,
         }
     )
 

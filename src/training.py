@@ -170,37 +170,22 @@ class Trainer:
 
 def train(
     model: nn.Module,
+    data_manager: DataManager,
     config: DictConfig,
     device: torch.device,
-    df_metadata: pd.DataFrame,
-    plant_data_image_info: list[ImageSampleInfo],
-    plant_data_split: DataSplit | None = None,
-    non_plant_data_split: DataSplit | None = None,
 ) -> tuple[torch.nn.Module, ModelInfo]:
     """
     Main function to set up and run the training and final testing process.
 
     Args:
         model: The neural network model.
+        data_manager: DataManager object to handle data loading and processing.
         config: Configuration object (OmegaConf).
         device: The device to train on (e.g., 'cuda', 'cpu').
-        df_metadata: DataFrame containing metadata for images.
-        plant_data_split: Optional DataSplit object for plant data.
-        non_plant_data_split: Optional DataSplit object for non-plant data.
 
     Returns:
         A tuple containing the trained model and model information.
     """
-
-    # Initialize data management
-    data_manager = DataManager(
-        config=config,
-        plant_data_image_info=plant_data_image_info,
-        plant_data_split=plant_data_split,
-        non_plant_data_split=non_plant_data_split,
-        df_metadata=df_metadata,
-    )
-
     evaluator = Evaluator(data_manager, model, config, device)
 
     # Initialize trainer
