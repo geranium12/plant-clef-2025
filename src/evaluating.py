@@ -82,15 +82,12 @@ class Evaluator:
             outputs = self.model(
                 pixel_values=images, labels=labels, plant_mask=labels["plant"] == 1
             )
-            all_outputs, all_labels = self.accelerator.gather_for_metrics(
-                (outputs, labels)
-            )
 
             loss = calculate_total_loss(
                 outputs, self.model.module.head_names, self.config
             )
 
-        return loss, all_outputs, all_labels
+        return loss, outputs, labels
 
     def _evaluate_head_batch(
         self, logits: torch.Tensor, labels: torch.Tensor, prefix: str, step: int
@@ -105,8 +102,8 @@ class Evaluator:
                 f"{prefix}/batch_precision": metrics["precision"],
                 f"{prefix}/batch_recall": metrics["recall"],
                 f"{prefix}/batch_f1": metrics["f1"],
+                f"{prefix}/step": step,
             },
-            step=step,
         )
 
         return probs
@@ -131,14 +128,12 @@ class Evaluator:
             )
             return {}
 
-        self.model, dataloader = self.accelerator.prepare(self.model, dataloader)
-
         self.model.eval()
         all_preds: dict[str, list[np.ndarray]] = {
-            name: [] for name in self.model.head_names
+            name: [] for name in self.model.module.head_names
         }
         all_labels: dict[str, list[np.ndarray]] = {
-            name: [] for name in self.model.head_names
+            name: [] for name in self.model.module.head_names
         }
         running_loss = 0.0
         results = {}
@@ -149,14 +144,19 @@ class Evaluator:
             total=len(dataloader),
         ):
             batch_loss, outputs, labels = self._evaluation_step(batch)
-            running_loss += batch_loss.item()
+
+            batch_loss = self.accelerator.gather_for_metrics(batch_loss)
+            outputs = self.accelerator.gather_for_metrics(outputs)
+            labels = self.accelerator.gather_for_metrics(labels)
+
+            running_loss += batch_loss.sum().item()
 
             # Log batch loss (optional, can be verbose)
             # self._log_loss(outputs, batch_loss, prefix=prefix, epoch=epoch, iteration=iteration)
 
             # Process each head for evaluation
-            plant_mask = labels["plant"] == 1
-            for head_name in self.model.head_names:
+            plant_mask = labels["species"] != -1
+            for head_name in self.model.module.head_names:
                 logits_key = f"logits_{head_name}"
                 logits = outputs[logits_key]
 
@@ -183,13 +183,15 @@ class Evaluator:
                 all_labels[head_name].append(lbls.cpu().numpy())
 
         avg_loss = running_loss / len(dataloader)
-        self.accelerator.log({f"{prefix}/epoch_loss": avg_loss}, step=epoch)
-        print(
+        self.accelerator.log(
+            {f"{prefix}/epoch/loss": avg_loss, f"{prefix}/epoch": epoch}
+        )
+        self.accelerator.print(
             f"{prefix.capitalize()} Epoch: {epoch + 1}/{self.config.training.epochs}, Avg Validation Loss: {avg_loss:.4f}"
         )
         results[f"{prefix}_loss"] = avg_loss
 
-        for head_name in self.model.head_names:
+        for head_name in self.model.module.head_names:
             y_pred = np.vstack(all_preds[head_name])
             y_true = np.concatenate(all_labels[head_name])
             y_true = y_true.ravel()  # Ensure y_true is 1D
@@ -197,14 +199,14 @@ class Evaluator:
             metrics = Evaluator.compute_metric(y_true, y_pred)
             self.accelerator.log(
                 {
-                    f"{prefix}/{head_name}/epoch_precision": metrics["precision"],
-                    f"{prefix}/{head_name}/epoch_recall": metrics["recall"],
-                    f"{prefix}/{head_name}/epoch_f1": metrics["f1"],
+                    f"{prefix}/{head_name}/epoch/precision": metrics["precision"],
+                    f"{prefix}/{head_name}/epoch/recall": metrics["recall"],
+                    f"{prefix}/{head_name}/epoch/f1": metrics["f1"],
+                    f"{prefix}/{head_name}/epoch/step": epoch,
                 },
-                step=epoch,
             )
 
-            print(
+            self.accelerator.print(
                 f"{prefix.capitalize()} Epoch {epoch + 1}/{self.config.training.epochs}, Head: {head_name}, "
                 f"Precision: {metrics['precision']:.4f}, Recall: {metrics['recall']:.4f}, F1: {metrics['f1']:.4f}"
             )

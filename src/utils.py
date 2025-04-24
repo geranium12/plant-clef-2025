@@ -6,6 +6,8 @@ import torch
 import torch.nn as nn
 from omegaconf import DictConfig
 
+import wandb
+
 
 def load_model(config: DictConfig, df_species_ids: pd.DataFrame) -> nn.Module:
     model = timm.create_model(
@@ -83,3 +85,18 @@ def calculate_total_loss(
             )  # Get weight, default to 0 if not specified
             total_loss += weight * outputs[loss_key]
     return total_loss
+
+
+def define_metrics() -> None:
+    wandb.define_metric("train/step")
+    wandb.define_metric("train/*", step_metric="train/step")
+    wandb.define_metric("train/epoch/step")
+    wandb.define_metric("train/epoch/*", step_metric="train/epoch/step")
+    wandb.define_metric("val/step")
+    wandb.define_metric("val/*", step_metric="val/step")
+    wandb.define_metric("val/epoch/step")
+    wandb.define_metric("val/epoch/*", step_metric="val/epoch/step")
+    wandb.define_metric("test/step")
+    wandb.define_metric("test/*", step_metric="test/step")
+    wandb.define_metric("test/epoch/step")
+    wandb.define_metric("test/epoch/*", step_metric="test/epoch/step")

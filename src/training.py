@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 
 import pandas as pd
@@ -42,6 +43,18 @@ class Trainer:
             lr=self.config.training.lr,
         )
 
+        (
+            self.optimizer,
+            self.data_manager.train_dataloader,
+            self.data_manager.val_dataloader,
+            self.data_manager.test_dataloader,
+        ) = self.accelerator.prepare(
+            self.optimizer,
+            self.data_manager.train_dataloader,
+            self.data_manager.val_dataloader,
+            self.data_manager.test_dataloader,
+        )
+
     def _log_loss(
         self,
         outputs: dict[str, torch.Tensor],
@@ -64,8 +77,9 @@ class Trainer:
                     f", Loss {head.capitalize()}: {outputs[loss_key].item():.4f}"
                 )
 
-        self.accelerator.log(log_data, step=step)
-        print(print_str)
+        log_data[f"{prefix}/step"] = step
+        self.accelerator.log(log_data)
+        self.accelerator.print(print_str)
 
     def _train_step(
         self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor]
@@ -98,15 +112,9 @@ class Trainer:
 
         return loss, outputs
 
-    def train(self) -> tuple[nn.Module, ModelInfo]:
+    def train(self) -> nn.Module:
         """Runs the main training loop."""
         self.model.train()
-
-        self.model, self.optimizer, self.data_manager.train_dataloader = (
-            self.accelerator.prepare(
-                self.model, self.optimizer, self.data_manager.train_dataloader
-            )
-        )
 
         for epoch in range(self.config.training.epochs):
             running_loss = 0.0
@@ -127,6 +135,18 @@ class Trainer:
                     + self.accelerator.process_index,
                 )
 
+                # Save model periodically
+                if (iteration + 1) % self.config.models.save.every == 0:
+                    save_folder = os.path.join(
+                        self.config.models.folder,
+                        self.config.models.save.folder,
+                        "checkpoints",
+                    )
+                    self.accelerator.save_state(save_folder)
+                    self.accelerator.print(
+                        f"Checkpoint saved at iteration {iteration + 1} of epoch {epoch + 1} to {save_folder}"
+                    )
+
                 # Perform validation periodically
                 if (
                     self.evaluator is not None
@@ -140,12 +160,9 @@ class Trainer:
 
             avg_epoch_loss = running_loss / len(self.data_manager.train_dataloader)
             self.accelerator.log(
-                {"train/epoch_loss": avg_epoch_loss},
-                step=iteration * self.accelerator.num_processes
-                + epoch * len(self.data_manager.train_dataloader)
-                + self.accelerator.process_index,
+                {"train/epoch/loss": avg_epoch_loss, "train/epoch/step": epoch},
             )
-            print(
+            self.accelerator.print(
                 f"Epoch: {epoch + 1}/{self.config.training.epochs}, Avg Training Loss: {avg_epoch_loss:.4f}"
             )
 
@@ -159,17 +176,7 @@ class Trainer:
                     epoch=epoch,
                 )
 
-        # --- Training Loop Finished ---
-
-        data_config = timm.data.resolve_model_data_config(self.model)
-        model_info = ModelInfo(
-            input_size=data_config["input_size"][1],  # Assuming (C, H, W)
-            mean=data_config["mean"],
-            std=data_config["std"],
-        )
-        print(f"Model info: {model_info}")
-
-        return self.model, model_info
+        return self.model
 
 
 def train(
@@ -203,15 +210,7 @@ def train(
         df_metadata=df_metadata,
     )
 
-    # (
-    #     data_manager.train_dataloader,
-    #     data_manager.val_dataloader,
-    #     data_manager.test_dataloader,
-    # ) = accelerator.prepare(
-    #     data_manager.train_dataloader,
-    #     data_manager.val_dataloader,
-    #     data_manager.test_dataloader,
-    # )
+    model = accelerator.prepare(model)
 
     evaluator = Evaluator(data_manager, model, config, accelerator)
 
@@ -225,20 +224,41 @@ def train(
     )
 
     # Run training
-    print("Starting training...")
-    trained_model, model_info = trainer.train()
-    print("Training finished.")
+    accelerator.print("Starting training...")
+    trained_model = trainer.train()
+    accelerator.print("Training finished.")
 
-    # Run final evaluation on the test set
-    print("Starting testing...")
-    test_results = evaluator.evaluate_on_dataloader(
-        dataloader=data_manager.test_dataloader,
-        prefix="test",
-        epoch=0,
+    accelerator.print("Saving the trained model...")
+    accelerator.wait_for_everyone()
+    unwrapped_model = accelerator.unwrap_model(trained_model)
+    save_path = os.path.join(
+        config.project_path,
+        config.models.save.folder,
     )
-    print("Testing finished.")
-    print("Final Test Results:")
-    for key, value in test_results.items():
-        print(f"- {key}: {value:.4f}")
+    accelerator.save_model(
+        unwrapped_model,
+        save_path,
+    )
+    accelerator.print(f"Model saved to {save_path}")
 
-    return trained_model, model_info
+    # # Run final evaluation on the test set
+    # accelerator.print("Starting testing...")
+    # test_results = evaluator.evaluate_on_dataloader(
+    #     dataloader=data_manager.test_dataloader,
+    #     prefix="test",
+    #     epoch=0,
+    # )
+    # accelerator.print("Testing finished.")
+    # accelerator.print("Final Test Results:")
+    # for key, value in test_results.items():
+    #     accelerator.print(f"- {key}: {value:.4f}")
+
+    data_config = timm.data.resolve_model_data_config(unwrapped_model)
+    model_info = ModelInfo(
+        input_size=data_config["input_size"][1],  # Assuming (C, H, W)
+        mean=data_config["mean"],
+        std=data_config["std"],
+    )
+    accelerator.print(f"Model info: {model_info}")
+
+    return unwrapped_model, model_info

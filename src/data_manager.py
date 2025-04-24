@@ -151,10 +151,18 @@ class DataManager:
         """
         labels = {"plant": plant_labels}
         batch_size = len(species_labels)
-        new_species_ids = torch.full((batch_size,), -1, dtype=torch.long)
-        genus_ids = torch.full((batch_size,), -1, dtype=torch.long)
-        family_ids = torch.full((batch_size,), -1, dtype=torch.long)
-        organ_ids = torch.full((batch_size,), -1, dtype=torch.long)
+        new_species_ids = torch.full(
+            (batch_size,), -1, dtype=torch.long, device=species_labels.device
+        )
+        genus_ids = torch.full(
+            (batch_size,), -1, dtype=torch.long, device=species_labels.device
+        )
+        family_ids = torch.full(
+            (batch_size,), -1, dtype=torch.long, device=species_labels.device
+        )
+        organ_ids = torch.full(
+            (batch_size,), -1, dtype=torch.long, device=species_labels.device
+        )
 
         # Process only plant samples (where species_id != -1)
         plant_mask = species_labels != -1

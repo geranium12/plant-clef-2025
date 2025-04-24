@@ -32,8 +32,9 @@ models:
   pretrained: false
   folder: "models/"
   checkpoint_file: "model_onlyclassifier_then_all/model_best.pth.tar"
-  save_folder: "5heads_all_labels_vit_base_patch14_reg4_dinov2.lvd142m"
-  save_file: "model_best1.pth.tar"
+  save:
+    folder: "saved_models/5heads_all_labels_vit_base_patch14_reg4_dinov2.lvd142m"
+    every: 1000
 
 training:
   use_all_data: false # if true, use all data for training

@@ -3,6 +3,7 @@ import time
 
 import torch
 import torchvision.transforms as ttransforms
+from accelerate import Accelerator
 from torch.amp import autocast
 from torch.utils.data import (
     DataLoader,
@@ -44,6 +45,7 @@ def predict(
     top_k_tile: int,
     class_map: dict[int, int],
     min_score: float,
+    accelerator: Accelerator,
 ) -> dict[str, list[int]]:
     image_predictions: dict[str, list[int]] = {}
 
@@ -115,7 +117,7 @@ def predict(
 
             # Log info at specified frequency
             if batch_idx % 10 == 0:  # You can set your log frequency here
-                print(
+                accelerator.print(
                     f"Predict: [{batch_idx}/{len(dataloader)}] "
                     f"Time {batch_time.val:.3f} ({batch_time.avg:.3f})"
                 )

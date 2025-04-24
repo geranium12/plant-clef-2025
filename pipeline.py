@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 import src.data as data
 from src import prediction, submission, training
-from src.utils import load_model
+from src.utils import define_metrics, load_model
 from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 from utils.build_hierarchies import (
     get_organ_number,
@@ -23,8 +23,6 @@ def pipeline(
     config: DictConfig,
     accelerator: Accelerator,
 ) -> None:
-    device = accelerator.device
-
     (
         df_metadata,
         df_species_ids,
@@ -105,6 +103,7 @@ def pipeline(
         top_k_tile=config.training.top_k_tile,
         class_map=class_map,
         min_score=config.training.min_score,
+        accelerator=accelerator,
     )
 
     submission.submit(
@@ -133,6 +132,9 @@ def main(
             }
         },
     )
+
+    if accelerator.is_main_process:
+        define_metrics()
 
     pipeline(config, accelerator)
 
