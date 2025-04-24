@@ -25,11 +25,7 @@ def pipeline(
     config: DictConfig,
     device: torch.device,
 ) -> None:
-    (
-        df_metadata,
-        df_species_ids,
-        class_map,
-    ) = data.load(config)
+    df_metadata = data.load(config)
 
     plant_data_image_info = data.get_plant_data_image_info(
         os.path.join(
@@ -73,7 +69,11 @@ def pipeline(
         )
     }
 
-    model = load_model(config=config, device=device, df_species_ids=df_species_ids)
+    model = load_model(
+        config=config,
+        device=device,
+        num_classes=len(df_metadata["species_id"].unique()),
+    )
     model = ViTMultiHeadClassifier(
         backbone=model,
         num_labels_organ=get_organ_number(df_metadata),
@@ -127,7 +127,7 @@ def pipeline(
         batch_size=config.training.batch_size,
         device=device,
         top_k_tile=config.training.top_k_tile,
-        class_map=class_map,
+        class_map=species_id_to_index,
         min_score=config.training.min_score,
     )
 
