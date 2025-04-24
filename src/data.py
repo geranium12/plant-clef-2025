@@ -375,11 +375,7 @@ def read_csv_in_chunks(path: str, **read_params: Any) -> pd.DataFrame:
 
 def load(
     config: DictConfig,
-) -> tuple[
-    pd.DataFrame,
-    pd.DataFrame,
-    dict[int, int],
-]:
+) -> pd.DataFrame:
     metadata_path = os.path.join(
         config.project_path, config.data.folder, config.data.metadata.folder
     )
@@ -390,16 +386,4 @@ def load(
         dtype={"partner": str},
     )
 
-    df_species_ids = pd.read_csv(
-        os.path.join(metadata_path, config.data.metadata.labels)
-    )
-
-    class_map = df_species_ids[
-        "species_id"
-    ].to_dict()  # dictionary to map the species model Id with the species Id
-
-    return (
-        df_metadata,
-        df_species_ids,
-        class_map,
-    )
+    return df_metadata
