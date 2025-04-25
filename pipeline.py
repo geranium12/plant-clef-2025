@@ -68,6 +68,7 @@ def pipeline(
             sorted({info.species_id for info in plant_data_image_info})
         )
     }
+    species_index_to_id = {idx: sid for sid, idx in species_id_to_index.items()}
 
     model = load_model(
         config=config,
@@ -127,7 +128,7 @@ def pipeline(
         batch_size=config.training.batch_size,
         device=device,
         top_k_tile=config.training.top_k_tile,
-        class_map=species_id_to_index,
+        class_map=species_index_to_id,
         min_score=config.training.min_score,
     )
 
