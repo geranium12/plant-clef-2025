@@ -109,13 +109,7 @@ def log_loss(
 def define_metrics() -> None:
     wandb.define_metric("train/step")
     wandb.define_metric("train/*", step_metric="train/step")
-    wandb.define_metric("train/epoch/step")
-    wandb.define_metric("train/epoch/*", step_metric="train/epoch/step")
     wandb.define_metric("val/step")
     wandb.define_metric("val/*", step_metric="val/step")
-    wandb.define_metric("val/epoch/step")
-    wandb.define_metric("val/epoch/*", step_metric="val/epoch/step")
     wandb.define_metric("test/step")
     wandb.define_metric("test/*", step_metric="test/step")
-    wandb.define_metric("test/epoch/step")
-    wandb.define_metric("test/epoch/*", step_metric="test/epoch/step")
