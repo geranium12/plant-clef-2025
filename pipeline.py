@@ -1,7 +1,7 @@
 import os
 
 import hydra
-import torch
+from accelerate import Accelerator
 from omegaconf import (
     DictConfig,
     OmegaConf,
@@ -9,10 +9,9 @@ from omegaconf import (
 from torch.utils.data import DataLoader
 
 import src.data as data
-import wandb
 from src import prediction, submission, training
 from src.data_manager import DataManager
-from src.utils import load_model, save_model
+from src.utils import define_metrics, load_model
 from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 from utils.build_hierarchies import (
     get_organ_number,
@@ -23,7 +22,7 @@ from utils.build_hierarchies import (
 
 def pipeline(
     config: DictConfig,
-    device: torch.device,
+    accelerator: Accelerator,
 ) -> None:
     df_metadata = data.load_metadata(config)
 
@@ -72,7 +71,6 @@ def pipeline(
 
     model = load_model(
         config=config,
-        device=device,
         num_classes=len(df_metadata["species_id"].unique()),
     )
     model = ViTMultiHeadClassifier(
@@ -82,7 +80,6 @@ def pipeline(
         num_labels_family=num_labels_family,
         num_labels_plant=1,
         num_labels_species=len(species_id_to_index),
-        device=device,
     )
     print(model)
 
@@ -100,10 +97,8 @@ def pipeline(
         model=model,
         data_manager=data_manager,
         config=config,
-        device=device,
+        accelerator=accelerator,
     )
-
-    save_model(model, config)
 
     submission_dataloader = DataLoader(
         dataset=data.TestDataset(
@@ -120,16 +115,17 @@ def pipeline(
         num_workers=config.training.num_workers,
         pin_memory=True,
     )
+    submission_dataloader = accelerator.prepare(submission_dataloader)
 
     image_predictions = prediction.predict(
         dataloader=submission_dataloader,
         model=model,
         model_info=model_info,
         batch_size=config.training.batch_size,
-        device=device,
         top_k_tile=config.training.top_k_tile,
         class_map=species_index_to_id,
         min_score=config.training.min_score,
+        accelerator=accelerator,
     )
 
     submission.submit(
@@ -146,18 +142,25 @@ def pipeline(
 def main(
     config: DictConfig,
 ) -> None:
-    wandb.init(
-        project=config.project_name,
-        name=f"{config.models.name}_{'pretrained' if config.models.pretrained else 'from-scratch'}",
-        config=OmegaConf.to_container(config),  # type: ignore[arg-type]
-        reinit=False if config is None else True,
+    accelerator = Accelerator(log_with="wandb")
+    accelerator.init_trackers(
+        config.project_name,
+        config=OmegaConf.to_container(config),
+        init_kwargs={
+            "wandb": {
+                "name": f"{config.models.name}_{'pretrained' if config.models.pretrained else 'from-scratch'}",
+            }
+        },
     )
 
-    device = torch.device(config.device)
+    if accelerator.is_main_process:
+        define_metrics()
 
-    pipeline(config, device)
+    # NOTE: accelerator logs on main process only -> loss from only one GPU is logged
+    # Gathering loss from all GPUs will slow down training
+    pipeline(config, accelerator)
 
-    wandb.finish()
+    accelerator.end_training()
 
 
 if __name__ == "__main__":

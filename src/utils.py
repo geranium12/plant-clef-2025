@@ -4,10 +4,13 @@ import pandas as pd
 import timm
 import torch
 import torch.nn as nn
+from accelerate import Accelerator
 from omegaconf import DictConfig
 
+import wandb
 
-def load_model(config: DictConfig, device: torch.device, num_classes: int) -> nn.Module:
+
+def load_model(config: DictConfig, num_classes: int) -> nn.Module:
     model = timm.create_model(
         config.models.name,
         pretrained=config.models.pretrained,
@@ -16,31 +19,8 @@ def load_model(config: DictConfig, device: torch.device, num_classes: int) -> nn
             config.project_path, config.models.folder, config.models.checkpoint_file
         ),
     )
-    model = model.to(device)
     model = model.eval()
     return model
-
-
-def save_model(
-    model: torch.nn.Module,
-    config: DictConfig,
-) -> None:
-    # check if the model folder exists, if not create it
-    os.makedirs(
-        os.path.join(
-            config.project_path,
-            config.models.save_folder,
-        ),
-        exist_ok=True,
-    )
-
-    model_path = os.path.join(
-        config.project_path,
-        config.models.save_folder,
-        config.models.save_file,
-    )
-    torch.save(model.state_dict(), model_path)
-    print(f"Model saved to {model_path}")
 
 
 def species_id_to_name(species_id: int, species_mapping: pd.DataFrame) -> str:
@@ -86,10 +66,9 @@ def calculate_total_loss(
     outputs: dict[str, torch.Tensor],
     head_names: list[str],
     config: DictConfig,
-    device: torch.device,
 ) -> torch.Tensor:
     """Calculates the weighted total loss."""
-    total_loss = torch.tensor(0.0, device=device)
+    total_loss = torch.tensor(0.0, device=outputs[f"loss_{head_names[0]}"].device)
     weights = config.training.loss_weights
     for head in head_names:
         loss_key = f"loss_{head}"
@@ -99,3 +78,38 @@ def calculate_total_loss(
             )  # Get weight, default to 0 if not specified
             total_loss += weight * outputs[loss_key]
     return total_loss
+
+
+def log_loss(
+    outputs: dict[str, torch.Tensor],
+    loss: torch.Tensor,
+    head_names: list[str],
+    accelerator: Accelerator,
+    prefix: str,
+    step: int,
+) -> None:
+    """Logs loss components to wandb and console."""
+    log_data = {
+        f"{prefix}/loss": loss.item(),
+    }
+
+    print_str = f"{prefix.capitalize()} Loss: {loss.item():.4f}"
+
+    for head in head_names:
+        loss_key = f"loss_{head}"
+        if loss_key in outputs:
+            log_data[f"{prefix}/{loss_key}"] = outputs[loss_key].item()
+            print_str += f", Loss {head.capitalize()}: {outputs[loss_key].item():.4f}"
+
+    log_data[f"{prefix}/step"] = step
+    accelerator.log(log_data)
+    accelerator.print(print_str)
+
+
+def define_metrics() -> None:
+    wandb.define_metric("train/step")
+    wandb.define_metric("train/*", step_metric="train/step")
+    wandb.define_metric("val/step")
+    wandb.define_metric("val/*", step_metric="val/step")
+    wandb.define_metric("test/step")
+    wandb.define_metric("test/*", step_metric="test/step")

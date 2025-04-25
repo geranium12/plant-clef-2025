@@ -146,7 +146,6 @@ class DataManager:
         species_ids: torch.Tensor,
         plant_labels: torch.Tensor,
         images_names: list[str],
-        device: torch.device,
     ) -> dict[str, torch.Tensor]:
         """
         Gathers and transforms labels for species, genus, family, and organ
@@ -154,10 +153,18 @@ class DataManager:
         """
         labels = {"plant": plant_labels}
         batch_size = len(species_ids)
-        species_indices = torch.full((batch_size,), -1, dtype=torch.long)
-        genus_ids = torch.full((batch_size,), -1, dtype=torch.long)
-        family_ids = torch.full((batch_size,), -1, dtype=torch.long)
-        organ_ids = torch.full((batch_size,), -1, dtype=torch.long)
+        species_indices = torch.full(
+            (batch_size,), -1, dtype=torch.long, device=species_ids.device
+        )
+        genus_ids = torch.full(
+            (batch_size,), -1, dtype=torch.long, device=species_ids.device
+        )
+        family_ids = torch.full(
+            (batch_size,), -1, dtype=torch.long, device=species_ids.device
+        )
+        organ_ids = torch.full(
+            (batch_size,), -1, dtype=torch.long, device=species_ids.device
+        )
 
         # Process only plant samples (where species_id != -1)
         plant_mask = species_ids != -1
@@ -178,8 +185,8 @@ class DataManager:
             family_ids[i] = family_name_to_id(family_name, self.family_mapping)
             organ_ids[i] = organ_name_to_id(organ_name, self.organ_mapping)
 
-        labels["species"] = species_indices.to(device)
-        labels["genus"] = genus_ids.to(device)
-        labels["family"] = family_ids.to(device)
-        labels["organ"] = organ_ids.to(device)
+        labels["species"] = species_indices
+        labels["genus"] = genus_ids
+        labels["family"] = family_ids
+        labels["organ"] = organ_ids
         return labels
