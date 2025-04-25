@@ -2,17 +2,17 @@
 
 #### Hanna
 - [x] Add eval to the pipeline
-- [ ] Train 5 heads of the pre-trained kaggle model (only-classifier-then-all) on augmented data + non-plant datasets
+- [x] Train 5 heads of the pre-trained kaggle model (only-classifier-then-all) on augmented data + non-plant datasets
 - [ ] Train the whole model (unfreeze the backbone) on augmented data + non-plant datasets
-- [ ] Add accelerate
-- [ ] Add checkpointing during training
-- [ ] Add EarlyStopping
-- [ ] Submit a model (no train) to test our pipeline
+- [x] Add accelerate
+- [x] Add checkpointing during training
+- [x] Add lr scheduler
 
 #### Robin
 - [ ] Integrate the LUCAS no labels dataset
-- [ ] Combine low-resource data classes
+- [x] Combine low-resource data classes
 - [ ] Figure out what DS@GT does for this challenge
+- [x] Submit a model (no train) to test our pipeline
 
 #### Tomo
 - [ ] Use trees for eval on multiplication of possible options
