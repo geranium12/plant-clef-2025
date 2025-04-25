@@ -142,8 +142,6 @@ def pipeline(
 def main(
     config: DictConfig,
 ) -> None:
-    accelerator = Accelerator()
-
     accelerator = Accelerator(log_with="wandb")
     accelerator.init_trackers(
         config.project_name,
