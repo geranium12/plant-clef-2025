@@ -36,11 +36,21 @@ class Trainer:
         self.accelerator = accelerator
         self.data_manager = data_manager
         self.evaluator = evaluator
+
         self.optimizer = optim.Adam(
             filter(lambda p: p.requires_grad, self.model.parameters()),
             lr=self.config.training.lr,
         )
-        self.optimizer = accelerator.prepare(self.optimizer)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer,
+            mode="min",
+            factor=self.config.training.scheduler.factor,
+            patience=self.config.training.scheduler.patience,
+            verbose=True,
+        )
+        self.optimizer, self.scheduler = accelerator.prepare(
+            self.optimizer, self.scheduler
+        )
 
     def _train_step(
         self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor]
@@ -106,6 +116,14 @@ class Trainer:
                     step=iteration + epoch * len(self.data_manager.train_dataloader),
                 )
 
+                self.accelerator.log(
+                    {
+                        "train/lr": self.scheduler.get_last_lr()[0],
+                        "train/step": iteration
+                        + epoch * len(self.data_manager.train_dataloader),
+                    }
+                )
+
                 # Save model periodically
                 if (iteration + 1) % self.config.models.save.every == 0:
                     save_folder = os.path.join(
@@ -120,18 +138,22 @@ class Trainer:
                     )
 
                 # Perform validation periodically
-                if (
-                    self.evaluator is not None
-                    and (iteration + 1) % self.config.evaluating.every == 0
-                ):
-                    _ = self.evaluator.evaluate_on_dataloader(
-                        model=self.model,
-                        config=self.config,
-                        data_manager=self.data_manager,
-                        dataloader=self.data_manager.val_dataloader,
-                        prefix="val",
-                        call_time=int(iteration / self.config.evaluating.every),
-                    )
+                if self.evaluator is not None:
+                    if (iteration + 1) % self.config.evaluating.every == 0:
+                        val_metrics = self.evaluator.evaluate_on_dataloader(
+                            model=self.model,
+                            config=self.config,
+                            data_manager=self.data_manager,
+                            dataloader=self.data_manager.val_dataloader,
+                            prefix="val",
+                            call_time=int(iteration / self.config.evaluating.every),
+                        )
+
+                        # Step the scheduler based on validation loss
+                        self.scheduler.step(val_metrics["val_avg_loss"])
+                else:
+                    # If no validation is performed, step based on training loss
+                    self.scheduler.step(loss.item())
 
             avg_epoch_loss = running_loss / len(self.data_manager.train_dataloader)
             self.accelerator.log(
