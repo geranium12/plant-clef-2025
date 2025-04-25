@@ -24,8 +24,8 @@ pipx install uv
 uv sync
 ```
 
-Then, you can run the code using uv.
+Then, set `CUDA_VISIBLE_DEVICES` and `main_process_port` to a random free port (if you run multiple accelerate pipelines) and run the code using uv.
 
 ```bash
-uv run pipeline.py
+CUDA_VISIBLE_DEVICES=2,3 uv run accelerate launch --main_process_port=29523 pipeline.py
 ```
