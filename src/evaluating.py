@@ -78,7 +78,7 @@ class Evaluator:
             loss = calculate_total_loss(
                 outputs=outputs,
                 head_names=model.module.head_names
-                if self.accelerator.num_processes > 1
+                if isinstance(model, nn.parallel.DistributedDataParallel)
                 else model.head_names,
                 config=config,
             )
@@ -137,7 +137,7 @@ class Evaluator:
 
         head_names = (
             model.module.head_names
-            if self.accelerator.num_processes > 1
+            if isinstance(model, nn.parallel.DistributedDataParallel)
             else model.head_names
         )
         all_preds: dict[str, list[np.ndarray]] = {name: [] for name in head_names}

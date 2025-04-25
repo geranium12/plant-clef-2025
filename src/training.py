@@ -68,7 +68,7 @@ class Trainer:
         loss = calculate_total_loss(
             outputs,
             self.model.module.head_names
-            if self.accelerator.num_processes > 1
+            if isinstance(self.model, nn.parallel.DistributedDataParallel)
             else self.model.head_names,
             self.config,
         )
@@ -84,7 +84,7 @@ class Trainer:
         self.model.train()
         head_names = (
             self.model.module.head_names
-            if self.accelerator.num_processes > 1
+            if isinstance(self.model, nn.parallel.DistributedDataParallel)
             else self.model.head_names
         )
         for epoch in range(self.config.training.epochs):
