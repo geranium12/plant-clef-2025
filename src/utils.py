@@ -4,16 +4,17 @@ import pandas as pd
 import timm
 import torch
 import torch.nn as nn
+from accelerate import Accelerator
 from omegaconf import DictConfig
 
 import wandb
 
 
-def load_model(config: DictConfig, df_species_ids: pd.DataFrame) -> nn.Module:
+def load_model(config: DictConfig, num_classes: int) -> nn.Module:
     model = timm.create_model(
         config.models.name,
         pretrained=config.models.pretrained,
-        num_classes=len(df_species_ids),
+        num_classes=num_classes,
         checkpoint_path=os.path.join(
             config.project_path, config.models.folder, config.models.checkpoint_file
         ),
@@ -27,14 +28,6 @@ def species_id_to_name(species_id: int, species_mapping: pd.DataFrame) -> str:
     if species_row.empty:
         raise ValueError(f"Species ID {species_id} not found in metadata")
     return str(species_row["species_name"].iloc[0])
-
-
-def species_name_to_new_id(species_name: str, species_mapping: pd.DataFrame) -> int:
-    species_row = species_mapping[species_mapping["species_name"] == species_name]
-    if species_row.empty:
-        raise ValueError(f"Species name '{species_name}' not found in mapping")
-
-    return int(species_row["new_species_id"].iloc[0])
 
 
 def genus_name_to_id(genus_name: str, genus_mapping: pd.DataFrame) -> int:
@@ -85,6 +78,32 @@ def calculate_total_loss(
             )  # Get weight, default to 0 if not specified
             total_loss += weight * outputs[loss_key]
     return total_loss
+
+
+def log_loss(
+    outputs: dict[str, torch.Tensor],
+    loss: torch.Tensor,
+    head_names: list[str],
+    accelerator: Accelerator,
+    prefix: str,
+    step: int,
+) -> None:
+    """Logs loss components to wandb and console."""
+    log_data = {
+        f"{prefix}/loss": loss.item(),
+    }
+
+    print_str = f"{prefix.capitalize()} Loss: {loss.item():.4f}"
+
+    for head in head_names:
+        loss_key = f"loss_{head}"
+        if loss_key in outputs:
+            log_data[f"{prefix}/{loss_key}"] = outputs[loss_key].item()
+            print_str += f", Loss {head.capitalize()}: {outputs[loss_key].item():.4f}"
+
+    log_data[f"{prefix}/step"] = step
+    accelerator.log(log_data)
+    accelerator.print(print_str)
 
 
 def define_metrics() -> None:

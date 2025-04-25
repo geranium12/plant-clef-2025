@@ -27,7 +27,10 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore
 
         # Build species classifier using the backbone head if available,
         # else fallback to a default classifier.
-        if hasattr(self.backbone, "head"):
+        if hasattr(self.backbone, "head") and (
+            num_labels_species is None
+            or num_labels_species == self.backbone.head.out_features
+        ):
             self.classifier_species = nn.Sequential(
                 nn.Linear(hidden_size, hidden_size),
                 nn.GELU(),

@@ -2,6 +2,7 @@ import os
 import pickle
 
 import hydra
+import numpy as np
 import pandas as pd
 from omegaconf import (
     DictConfig,
@@ -180,16 +181,18 @@ def read_organ_hierarchy(config: DictConfig) -> pd.DataFrame:
 
 
 def map_species_str_to_id(config: DictConfig, df_metadata: pd.DataFrame) -> None:
-    species_ids = df_metadata["species_id"].unique()
-    new_species_ids = range(len(species_ids))
+    species_ids = df_metadata["species_id"].sort_values().unique()
+    assert 0 not in species_ids  # We want to use 0 for all not listed species
+    species_ids = np.insert(species_ids, 0, 0)
     species_mapping = pd.DataFrame(
         {
             "species_id": species_ids,
             "species_name": [
                 df_metadata[df_metadata["species_id"] == sid]["species"].iloc[0]
+                if sid != 0
+                else "other species"
                 for sid in species_ids
             ],
-            "new_species_id": new_species_ids,
         }
     )
 
@@ -276,7 +279,7 @@ def main(
     config: DictConfig,
 ) -> None:
     # Read the CSV file
-    df_metadata, _, _ = data.load(config)
+    df_metadata = data.load_metadata(config)
 
     map_species_str_to_id(config, df_metadata)
     map_genus_str_to_id(config, df_metadata)

@@ -1,7 +1,6 @@
 import os
 from dataclasses import dataclass
 
-import pandas as pd
 import timm
 import torch
 import torch.nn as nn
@@ -11,10 +10,9 @@ from omegaconf import DictConfig
 from tqdm import tqdm
 
 import src.augmentation
-from src.data import DataSplit
 from src.data_manager import DataManager
 from src.evaluating import Evaluator
-from src.utils import calculate_total_loss
+from src.utils import calculate_total_loss, log_loss
 
 
 @dataclass
@@ -42,44 +40,7 @@ class Trainer:
             filter(lambda p: p.requires_grad, self.model.parameters()),
             lr=self.config.training.lr,
         )
-
-        (
-            self.optimizer,
-            self.data_manager.train_dataloader,
-            self.data_manager.val_dataloader,
-            self.data_manager.test_dataloader,
-        ) = self.accelerator.prepare(
-            self.optimizer,
-            self.data_manager.train_dataloader,
-            self.data_manager.val_dataloader,
-            self.data_manager.test_dataloader,
-        )
-
-    def _log_loss(
-        self,
-        outputs: dict[str, torch.Tensor],
-        loss: torch.Tensor,
-        prefix: str,
-        step: int,
-    ) -> None:
-        """Logs loss components to wandb and console."""
-        log_data = {
-            f"{prefix}/loss": loss.item(),
-        }
-
-        print_str = f"{prefix.capitalize()} Loss: {loss.item():.4f}"
-
-        for head in self.model.module.head_names:
-            loss_key = f"loss_{head}"
-            if loss_key in outputs:
-                log_data[f"{prefix}/{loss_key}"] = outputs[loss_key].item()
-                print_str += (
-                    f", Loss {head.capitalize()}: {outputs[loss_key].item():.4f}"
-                )
-
-        log_data[f"{prefix}/step"] = step
-        self.accelerator.log(log_data)
-        self.accelerator.print(print_str)
+        self.optimizer = accelerator.prepare(self.optimizer)
 
     def _train_step(
         self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor]
@@ -126,21 +87,22 @@ class Trainer:
                 loss, outputs = self._train_step(batch)
                 running_loss += loss.item()
 
-                self._log_loss(
-                    outputs,
-                    loss,
+                log_loss(
+                    outputs=outputs,
+                    loss=loss,
+                    head_names=self.model.module.head_names,
+                    accelerator=self.accelerator,
                     prefix="train",
-                    step=iteration * self.accelerator.num_processes
-                    + epoch * len(self.data_manager.train_dataloader)
-                    + self.accelerator.process_index,
+                    step=iteration + epoch * len(self.data_manager.train_dataloader),
                 )
 
                 # Save model periodically
                 if (iteration + 1) % self.config.models.save.every == 0:
                     save_folder = os.path.join(
+                        self.config.project_path,
                         self.config.models.folder,
                         self.config.models.save.folder,
-                        "checkpoints",
+                        f"checkpoint_ep{epoch + 1}_it{iteration + 1}",
                     )
                     self.accelerator.save_state(save_folder)
                     self.accelerator.print(
@@ -153,9 +115,12 @@ class Trainer:
                     and (iteration + 1) % self.config.evaluating.every == 0
                 ):
                     _ = self.evaluator.evaluate_on_dataloader(
+                        model=self.model,
+                        config=self.config,
+                        data_manager=self.data_manager,
                         dataloader=self.data_manager.val_dataloader,
                         prefix="val",
-                        epoch=epoch,
+                        call_time=int(iteration / self.config.evaluating.every),
                     )
 
             avg_epoch_loss = running_loss / len(self.data_manager.train_dataloader)
@@ -171,9 +136,12 @@ class Trainer:
                 self.data_manager.train_dataloader
             ):
                 _ = self.evaluator.evaluate_on_dataloader(
+                    model=self.model,
+                    config=self.config,
+                    data_manager=self.data_manager,
                     dataloader=self.data_manager.val_dataloader,
                     prefix="val",
-                    epoch=epoch,
+                    call_time=epoch,
                 )
 
         return self.model
@@ -181,17 +149,16 @@ class Trainer:
 
 def train(
     model: nn.Module,
+    data_manager: DataManager,
     config: DictConfig,
-    df_metadata: pd.DataFrame,
     accelerator: Accelerator,
-    plant_data_split: DataSplit | None = None,
-    non_plant_data_split: DataSplit | None = None,
 ) -> tuple[torch.nn.Module, ModelInfo]:
     """
     Main function to set up and run the training and final testing process.
 
     Args:
         model: The neural network model.
+        data_manager: DataManager object to handle data loading and processing.
         config: Configuration object (OmegaConf).
         accelerator: Accelerator object for distributed training.
         df_metadata: DataFrame containing metadata for images.
@@ -202,17 +169,18 @@ def train(
         A tuple containing the trained model and model information.
     """
 
-    # Initialize data management
-    data_manager = DataManager(
-        config=config,
-        plant_data_split=plant_data_split,
-        non_plant_data_split=non_plant_data_split,
-        df_metadata=df_metadata,
+    model = accelerator.prepare(model)
+    (
+        data_manager.train_dataloader,
+        data_manager.val_dataloader,
+        data_manager.test_dataloader,
+    ) = accelerator.prepare(
+        data_manager.train_dataloader,
+        data_manager.val_dataloader,
+        data_manager.test_dataloader,
     )
 
-    model = accelerator.prepare(model)
-
-    evaluator = Evaluator(data_manager, model, config, accelerator)
+    evaluator = Evaluator(accelerator)
 
     # Initialize trainer
     trainer = Trainer(
@@ -233,7 +201,9 @@ def train(
     unwrapped_model = accelerator.unwrap_model(trained_model)
     save_path = os.path.join(
         config.project_path,
+        config.models.folder,
         config.models.save.folder,
+        "final_model",
     )
     accelerator.save_model(
         unwrapped_model,
@@ -244,9 +214,12 @@ def train(
     # Run final evaluation on the test set
     accelerator.print("Starting testing...")
     test_results = evaluator.evaluate_on_dataloader(
+        model=model,
+        config=config,
+        data_manager=data_manager,
         dataloader=data_manager.test_dataloader,
         prefix="test",
-        epoch=0,
+        call_time=0,
     )
     accelerator.print("Testing finished.")
     accelerator.print("Final Test Results:")

@@ -8,23 +8,11 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.data_manager import DataManager
-from src.utils import calculate_total_loss
+from src.utils import calculate_total_loss, log_loss
 
 
 class Evaluator:
-    def __init__(
-        self,
-        data_manager: DataManager,
-        model: nn.Module,
-        config: DictConfig,
-        accelerator: Accelerator,
-    ) -> None:
-        """
-        Initialize the Evaluator.
-        """
-        self.data_manager = data_manager
-        self.model = model
-        self.config = config
+    def __init__(self, accelerator: Accelerator) -> None:
         self.accelerator = accelerator
 
     @staticmethod
@@ -66,26 +54,28 @@ class Evaluator:
         }
 
     def _evaluation_step(
-        self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        self,
+        batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        data_manager: DataManager,
+        model: nn.Module,
+        config: DictConfig,
     ) -> tuple[torch.Tensor, dict[str, torch.Tensor], dict[str, torch.Tensor]]:
         """Performs a single evaluation (validation or test) step."""
         images, species_labels, images_names = batch
         plant_labels = (species_labels != -1).clone().detach().to(dtype=torch.float32)
 
         # Gather labels
-        labels = self.data_manager.gather_all_labels(
+        labels = data_manager.gather_all_labels(
             species_labels, plant_labels, images_names
         )
 
         # Forward pass (no gradients)
         with torch.no_grad():
-            outputs = self.model(
+            outputs = model(
                 pixel_values=images, labels=labels, plant_mask=labels["plant"] == 1
             )
 
-            loss = calculate_total_loss(
-                outputs, self.model.module.head_names, self.config
-            )
+            loss = calculate_total_loss(outputs, model.module.head_names, config)
 
         return loss, outputs, labels
 
@@ -99,17 +89,23 @@ class Evaluator:
         metrics = Evaluator.compute_metric(labels, probs)
         self.accelerator.log(
             {
-                f"{prefix}/batch_precision": metrics["precision"],
-                f"{prefix}/batch_recall": metrics["recall"],
-                f"{prefix}/batch_f1": metrics["f1"],
-                f"{prefix}/step": step,
+                f"{prefix}/batch/precision": metrics["precision"],
+                f"{prefix}/batch/recall": metrics["recall"],
+                f"{prefix}/batch/f1": metrics["f1"],
+                f"{prefix}/batch/step": step,
             },
         )
 
         return probs
 
     def evaluate_on_dataloader(
-        self, dataloader: DataLoader, prefix: str, epoch: int
+        self,
+        model: nn.Module,
+        config: DictConfig,
+        data_manager: DataManager,
+        dataloader: DataLoader,
+        prefix: str,
+        call_time: int,
     ) -> dict[str, float]:
         """
         Performs evaluation on a given dataloader (validation or test).
@@ -128,12 +124,12 @@ class Evaluator:
             )
             return {}
 
-        self.model.eval()
+        model.eval()
         all_preds: dict[str, list[np.ndarray]] = {
-            name: [] for name in self.model.module.head_names
+            name: [] for name in model.module.head_names
         }
         all_labels: dict[str, list[np.ndarray]] = {
-            name: [] for name in self.model.module.head_names
+            name: [] for name in model.module.head_names
         }
         running_loss = 0.0
         results = {}
@@ -143,7 +139,9 @@ class Evaluator:
             desc=f"Evaluating ({prefix.capitalize()})",
             total=len(dataloader),
         ):
-            batch_loss, outputs, labels = self._evaluation_step(batch)
+            batch_loss, outputs, labels = self._evaluation_step(
+                batch, data_manager, model, config
+            )
 
             batch_loss = self.accelerator.gather_for_metrics(batch_loss)
             outputs = self.accelerator.gather_for_metrics(outputs)
@@ -151,12 +149,24 @@ class Evaluator:
 
             running_loss += batch_loss.sum().item()
 
-            # Log batch loss (optional, can be verbose)
-            # self._log_loss(outputs, batch_loss, prefix=prefix, epoch=epoch, iteration=iteration)
+            batch_loss = batch_loss.mean()
+            for head_name in model.module.head_names:
+                loss_key = f"loss_{head_name}"
+                if loss_key in outputs:
+                    outputs[loss_key] = outputs[loss_key].mean()
+
+            log_loss(
+                outputs=outputs,
+                loss=batch_loss.sum(),
+                prefix=prefix,
+                head_names=model.module.head_names,
+                accelerator=self.accelerator,
+                step=iteration + call_time * len(dataloader),
+            )
 
             # Process each head for evaluation
             plant_mask = labels["species"] != -1
-            for head_name in self.model.module.head_names:
+            for head_name in model.module.head_names:
                 logits_key = f"logits_{head_name}"
                 logits = outputs[logits_key]
 
@@ -173,9 +183,7 @@ class Evaluator:
                     selected_logits,
                     lbls,
                     prefix=f"{prefix}/{head_name}",
-                    step=iteration * self.accelerator.num_processes
-                    + epoch * len(dataloader)
-                    + self.accelerator.process_index,
+                    step=iteration + call_time * len(dataloader),
                 )
 
                 # Store predictions and labels for epoch-level evaluation
@@ -184,14 +192,14 @@ class Evaluator:
 
         avg_loss = running_loss / len(dataloader)
         self.accelerator.log(
-            {f"{prefix}/epoch/loss": avg_loss, f"{prefix}/epoch": epoch}
+            {f"{prefix}/avg_loss": avg_loss, f"{prefix}/step": call_time}
         )
         self.accelerator.print(
-            f"{prefix.capitalize()} Epoch: {epoch + 1}/{self.config.training.epochs}, Avg Validation Loss: {avg_loss:.4f}"
+            f"{prefix.capitalize()} Call Time: {call_time}, Avg Validation Loss: {avg_loss:.4f}"
         )
-        results[f"{prefix}_loss"] = avg_loss
+        results[f"{prefix}_avg_loss"] = avg_loss
 
-        for head_name in self.model.module.head_names:
+        for head_name in model.module.head_names:
             y_pred = np.vstack(all_preds[head_name])
             y_true = np.concatenate(all_labels[head_name])
             y_true = y_true.ravel()  # Ensure y_true is 1D
@@ -199,20 +207,20 @@ class Evaluator:
             metrics = Evaluator.compute_metric(y_true, y_pred)
             self.accelerator.log(
                 {
-                    f"{prefix}/{head_name}/epoch/precision": metrics["precision"],
-                    f"{prefix}/{head_name}/epoch/recall": metrics["recall"],
-                    f"{prefix}/{head_name}/epoch/f1": metrics["f1"],
-                    f"{prefix}/{head_name}/epoch/step": epoch,
+                    f"{prefix}/{head_name}/precision": metrics["precision"],
+                    f"{prefix}/{head_name}/recall": metrics["recall"],
+                    f"{prefix}/{head_name}/f1": metrics["f1"],
+                    f"{prefix}/{head_name}/step": call_time,
                 },
             )
 
             self.accelerator.print(
-                f"{prefix.capitalize()} Epoch {epoch + 1}/{self.config.training.epochs}, Head: {head_name}, "
+                f"{prefix.capitalize()} Call Time {call_time}, Head: {head_name}, "
                 f"Precision: {metrics['precision']:.4f}, Recall: {metrics['recall']:.4f}, F1: {metrics['f1']:.4f}"
             )
             results[f"{prefix}_{head_name}_precision"] = metrics["precision"]
             results[f"{prefix}_{head_name}_recall"] = metrics["recall"]
             results[f"{prefix}_{head_name}_f1"] = metrics["f1"]
 
-        self.model.train()
+        model.train()
         return results

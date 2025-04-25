@@ -12,7 +12,6 @@ data:
     training: "PlantCLEF2024_single_plant_training_metadata.csv"
     test: "PlantCLEF2025_test.csv"
     no_label: "pseudoquadrats_without_labels_complementary_training_set_urls.csv"
-    labels: "species_ids.csv"
   train_folder: "plant_clef_train_281gb/"
   test_folder: "plant_clef_2025_test/"
   test_images_folder: "PlantCLEF2025_test_images/PlantCLEF2025_test_images/"
@@ -23,9 +22,10 @@ data:
     genus_mapping: "genus_ids.csv"
     family_mapping: "family_ids.csv"
     organ_mapping: "organ_ids.csv"
-    species_mapping: "species_ids.csv"
+    species_mapping: "species_names.csv"
   other:
     folder: "other/"
+  combine_classes_threshold: 0 # The minimum number of images required for a class the get its own label
 
 models:
   name: "vit_base_patch14_reg4_dinov2.lvd142m"
