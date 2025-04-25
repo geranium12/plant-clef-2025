@@ -75,7 +75,13 @@ class Evaluator:
                 pixel_values=images, labels=labels, plant_mask=labels["plant"] == 1
             )
 
-            loss = calculate_total_loss(outputs, model.module.head_names, config)
+            loss = calculate_total_loss(
+                outputs=outputs,
+                head_names=model.module.head_names
+                if self.accelerator.num_processes > 1
+                else model.head_names,
+                config=config,
+            )
 
         return loss, outputs, labels
 
@@ -111,9 +117,12 @@ class Evaluator:
         Performs evaluation on a given dataloader (validation or test).
 
         Args:
+            model: The model to evaluate.
+            config: The configuration object.
+            data_manager: The data manager for gathering labels.
             dataloader: The DataLoader to evaluate on.
             prefix: The prefix string for logging (e.g., "val", "test").
-            epoch: The current epoch number (optional, mainly for validation).
+            call_time: The current call time for this evaluation so that the log is shown nicely on wandb.
 
         Returns:
             A dictionary containing overall loss and per-head metrics.
@@ -125,12 +134,14 @@ class Evaluator:
             return {}
 
         model.eval()
-        all_preds: dict[str, list[np.ndarray]] = {
-            name: [] for name in model.module.head_names
-        }
-        all_labels: dict[str, list[np.ndarray]] = {
-            name: [] for name in model.module.head_names
-        }
+
+        head_names = (
+            model.module.head_names
+            if self.accelerator.num_processes > 1
+            else model.head_names
+        )
+        all_preds: dict[str, list[np.ndarray]] = {name: [] for name in head_names}
+        all_labels: dict[str, list[np.ndarray]] = {name: [] for name in head_names}
         running_loss = 0.0
         results = {}
 
@@ -150,7 +161,7 @@ class Evaluator:
             running_loss += batch_loss.sum().item()
 
             batch_loss = batch_loss.mean()
-            for head_name in model.module.head_names:
+            for head_name in head_names:
                 loss_key = f"loss_{head_name}"
                 if loss_key in outputs:
                     outputs[loss_key] = outputs[loss_key].mean()
@@ -159,14 +170,14 @@ class Evaluator:
                 outputs=outputs,
                 loss=batch_loss.sum(),
                 prefix=prefix,
-                head_names=model.module.head_names,
+                head_names=head_names,
                 accelerator=self.accelerator,
                 step=iteration + call_time * len(dataloader),
             )
 
             # Process each head for evaluation
             plant_mask = labels["species"] != -1
-            for head_name in model.module.head_names:
+            for head_name in head_names:
                 logits_key = f"logits_{head_name}"
                 logits = outputs[logits_key]
 
@@ -199,7 +210,7 @@ class Evaluator:
         )
         results[f"{prefix}_avg_loss"] = avg_loss
 
-        for head_name in model.module.head_names:
+        for head_name in head_names:
             y_pred = np.vstack(all_preds[head_name])
             y_true = np.concatenate(all_labels[head_name])
             y_true = y_true.ravel()  # Ensure y_true is 1D

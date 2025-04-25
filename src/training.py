@@ -65,7 +65,13 @@ class Trainer:
         )
 
         # Calculate loss
-        loss = calculate_total_loss(outputs, self.model.module.head_names, self.config)
+        loss = calculate_total_loss(
+            outputs,
+            self.model.module.head_names
+            if self.accelerator.num_processes > 1
+            else self.model.head_names,
+            self.config,
+        )
 
         # Backward pass and optimization
         self.accelerator.backward(loss)
@@ -76,7 +82,11 @@ class Trainer:
     def train(self) -> nn.Module:
         """Runs the main training loop."""
         self.model.train()
-
+        head_names = (
+            self.model.module.head_names
+            if self.accelerator.num_processes > 1
+            else self.model.head_names
+        )
         for epoch in range(self.config.training.epochs):
             running_loss = 0.0
             for iteration, batch in tqdm(
@@ -90,7 +100,7 @@ class Trainer:
                 log_loss(
                     outputs=outputs,
                     loss=loss,
-                    head_names=self.model.module.head_names,
+                    head_names=head_names,
                     accelerator=self.accelerator,
                     prefix="train",
                     step=iteration + epoch * len(self.data_manager.train_dataloader),
@@ -161,9 +171,6 @@ def train(
         data_manager: DataManager object to handle data loading and processing.
         config: Configuration object (OmegaConf).
         accelerator: Accelerator object for distributed training.
-        df_metadata: DataFrame containing metadata for images.
-        plant_data_split: Optional DataSplit object for plant data.
-        non_plant_data_split: Optional DataSplit object for non-plant data.
 
     Returns:
         A tuple containing the trained model and model information.
