@@ -8,6 +8,7 @@
 - [x] Add checkpointing during training
 - [x] Add lr scheduler
 - [x] Integrate the LUCAS no labels dataset
+- [ ] Continue trainining the model on the LUCAS no labels dataset
 
 #### Robin
 - [x] Combine low-resource data classes
@@ -19,8 +20,7 @@
 - [ ] Implement multi-scale tiling for inference
 
 ## Later TODO
-- [ ] Continue trainining the model on the LUCAS no labels dataset
-- [ ] Finetune ViT Large on plant data
+- [ ] Finetune ViT Large on plant data (not reasonable?)
 
 ## Done
 - [x] Set up hydra
