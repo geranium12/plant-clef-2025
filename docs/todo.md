@@ -7,9 +7,9 @@
 - [x] Add accelerate
 - [x] Add checkpointing during training
 - [x] Add lr scheduler
+- [x] Integrate the LUCAS no labels dataset
 
 #### Robin
-- [ ] Integrate the LUCAS no labels dataset
 - [x] Combine low-resource data classes
 - [ ] Figure out what DS@GT does for this challenge
 - [x] Submit a model (no train) to test our pipeline
