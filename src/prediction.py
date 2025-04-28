@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 import pandas as pd
+import torch
 
 from omegaconf import DictConfig
 
@@ -217,8 +218,8 @@ def predict_all(
         species_to_family.append(fid)
 
 
-    species_to_genus = np.array(species_to_genus)
-    species_to_family = np.array(species_to_family)
+    species_to_genus = torch.FloatTensor(species_to_genus)
+    species_to_family = torch.FloatTensor(species_to_family)
     
     # Initialize batch time tracking
     batch_time = AverageMeter()
