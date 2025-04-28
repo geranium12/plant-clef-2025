@@ -1,8 +1,5 @@
 import os
 
-import numpy as np
-import pandas as pd
-
 import hydra
 from accelerate import Accelerator
 from omegaconf import (
@@ -20,13 +17,6 @@ from utils.build_hierarchies import (
     get_organ_number,
     get_plant_tree_number,
     read_plant_taxonomy,
-    check_utils_folder,
-    get_genus_family_from_species,
-)
-from src.utils import (
-    species_id_to_name,
-    genus_name_to_id,
-    family_name_to_id
 )
 
 
@@ -152,88 +142,26 @@ def pipeline(
 def main(
     config: DictConfig,
 ) -> None:
-    #accelerator = Accelerator(log_with="wandb")
-    #accelerator.init_trackers(
-    #    config.project_name,
-    #    config=OmegaConf.to_container(config),
-    #    init_kwargs={
-    #        "wandb": {
-    #            "name": f"{config.models.name}_{'pretrained' if config.models.pretrained else 'from-scratch'}",
-    #        }
-    #    },
-    #)
+    accelerator = Accelerator(log_with="wandb")
+    accelerator.init_trackers(
+        config.project_name,
+        config=OmegaConf.to_container(config),
+        init_kwargs={
+            "wandb": {
+                "name": f"{config.models.name}_{'pretrained' if config.models.pretrained else 'from-scratch'}",
+            }
+        },
+    )
 
-    #if accelerator.is_main_process:
-    #    define_metrics()
+    if accelerator.is_main_process:
+        define_metrics()
 
     # NOTE: accelerator logs on main process only -> loss from only one GPU is logged
     # Gathering loss from all GPUs will slow down training
-    #pipeline(config, accelerator)
+    pipeline(config, accelerator)
 
-    #accelerator.end_training()
-    
-    plant_tree = read_plant_taxonomy(config)
-    folder_path = check_utils_folder(config)
+    accelerator.end_training()
 
-    species_mapping = pd.read_csv(
-                os.path.join(
-            folder_path,
-            config.data.utils.species_mapping,
-        ),
-        index_col=False,
-    )
-    
-    genus_mapping = pd.read_csv(
-                os.path.join(
-            folder_path,
-            config.data.utils.genus_mapping,
-        ),
-        index_col=False,
-    )
-
-    family_mapping = pd.read_csv(
-        os.path.join(
-            folder_path,
-            config.data.utils.family_mapping,
-        ),
-        index_col=False,
-    )
-
-    plant_data_image_info = data.get_plant_data_image_info(
-        os.path.join(
-            config.project_path,
-            config.data.folder,
-            config.data.train_folder,
-        ),
-        combine_classes_threshold=config.data.combine_classes_threshold,
-    )
-    
-    species_id_to_index = {
-        sid: idx
-        for idx, sid in enumerate(
-            sorted({info.species_id for info in plant_data_image_info})
-        )
-    }
-
-    species_to_other = sorted([
-        (species_index, get_genus_family_from_species(plant_tree, species_id_to_name(species_id, species_mapping)))
-        for species_id, species_index in species_id_to_index.items()
-    ])
-
-    species_to_genus = []
-    species_to_family = []
-    for _, (genus, family) in species_to_other:
-        gid = genus_name_to_id(genus, genus_mapping)
-        fid = family_name_to_id(family, family_mapping)
-        species_to_genus.append(gid)
-        species_to_family.append(fid)
-
-
-    species_to_genus = np.array(species_to_genus)
-    species_to_family = np.array(species_to_family)
-
-    breakpoint()
-    
 
 if __name__ == "__main__":
     main()
