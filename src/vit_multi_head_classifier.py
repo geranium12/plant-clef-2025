@@ -16,6 +16,7 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore
         num_labels_plant: int = 1,
         num_labels_species: int | None = None,
         freeze_backbone: bool = True,
+        freeze_species_head: bool = False,
     ) -> None:
         super().__init__()
 
@@ -32,9 +33,13 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore
             or num_labels_species == self.backbone.head.out_features
         ):
             self.classifier_species = nn.Sequential(
-                nn.Linear(hidden_size, hidden_size),
-                nn.GELU(),
-                deepcopy(self.backbone.head),
+                *(
+                    nn.Linear(hidden_size, hidden_size),
+                    nn.GELU(),
+                    deepcopy(self.backbone.head),
+                )
+                if not freeze_species_head
+                else deepcopy(self.backbone.head)
             )
             # Replace the backbone head with an identity function
             self.backbone.head = nn.Identity()
@@ -60,6 +65,9 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore
         # Optionally freeze backbone parameters.
         if freeze_backbone:
             for param in self.backbone.parameters():
+                param.requires_grad = False
+        if freeze_species_head:
+            for param in self.classifier_species.parameters():
                 param.requires_grad = False
 
         self.head_names = ["species", "genus", "family", "plant", "organ"]

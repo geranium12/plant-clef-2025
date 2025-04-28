@@ -35,8 +35,10 @@ models:
   save:
     folder: "saved_models/5heads_all_labels_vit_base_patch14_reg4_dinov2.lvd142m"
     every: 1000
+  freeze_species_head: false # if true, just keep the original species head
 
 training:
+  enabled: true # if true, train the model
   use_all_data: false # if true, use all data for training
   val_size: 0.05
   test_size: 0.1
@@ -62,6 +64,7 @@ evaluating:
   batch_size: 144
   shuffle: True
   num_workers: 8
+  test_enabled: true # if true, evaluate on the test set
 
 image_width: 518
 image_height: 518

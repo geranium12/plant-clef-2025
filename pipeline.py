@@ -80,6 +80,7 @@ def pipeline(
         num_labels_family=num_labels_family,
         num_labels_plant=1,
         num_labels_species=len(species_id_to_index),
+        freeze_species_head=config.models.freeze_species_head,
     )
     print(model)
 
