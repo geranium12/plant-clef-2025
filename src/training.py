@@ -242,7 +242,9 @@ def train(
         )
         accelerator.print(f"Model saved to {save_path}")
 
-    if config.evaluation.test_enabled:
+    unwrapped_model = unwrapped_model if unwrapped_model else model
+
+    if config.evaluating.test_enabled:
         # Run final evaluation on the test set
         accelerator.print("Starting testing...")
         test_results = evaluator.evaluate_on_dataloader(
@@ -258,9 +260,7 @@ def train(
         for key, value in test_results.items():
             accelerator.print(f"- {key}: {value:.4f}")
 
-    data_config = timm.data.resolve_model_data_config(
-        unwrapped_model if unwrapped_model else model
-    )
+    data_config = timm.data.resolve_model_data_config(unwrapped_model)
     model_info = ModelInfo(
         input_size=data_config["input_size"][1],  # Assuming (C, H, W)
         mean=data_config["mean"],
