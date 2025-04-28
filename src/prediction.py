@@ -1,6 +1,7 @@
 import os
 import time
 
+import numpy as np
 import pandas as pd
 
 from omegaconf import DictConfig
@@ -30,9 +31,11 @@ from utils.build_hierarchies import (
     get_genus_family_from_species,
 )
 from src.utils import (
+    species_id_to_name,
     genus_name_to_id,
     family_name_to_id
 )
+
 
 
 
@@ -143,7 +146,7 @@ def predict(
 
     return image_predictions
 
-def predict(
+def predict_all(
     dataloader: DataLoader,
     model: torch.nn.Module,
     model_info: ModelInfo,
@@ -184,9 +187,25 @@ def predict(
         index_col=False,
     )
     
+    plant_data_image_info = data.get_plant_data_image_info(
+        os.path.join(
+            config.project_path,
+            config.data.folder,
+            config.data.train_folder,
+        ),
+        combine_classes_threshold=config.data.combine_classes_threshold,
+    )
+    
+    species_id_to_index = {
+        sid: idx
+        for idx, sid in enumerate(
+            sorted({info.species_id for info in plant_data_image_info})
+        )
+    }
+
     species_to_other = sorted([
-        (species[1]['new_species_id'], get_genus_family_from_species(plant_tree, species[1]['species_name']))
-        for species in species_mapping.iterrows()
+        (species_index, get_genus_family_from_species(plant_tree, species_id_to_name(species_id, species_mapping)))
+        for species_id, species_index in species_id_to_index.items()
     ])
 
     species_to_genus = []
