@@ -67,6 +67,7 @@ evaluating:
   test_enabled: true # if true, evaluate on the test set
 
 prediction:
+  use_genus_and_family: true
   tiling:
     scales:
       - 1.0
@@ -76,10 +77,6 @@ prediction:
       - 0.0
       - 0.5
       - 0.25
-
-
-prediction:
-  use_genus_and_family: true
 
 image_width: 518
 image_height: 518
