@@ -1,3 +1,4 @@
+import math
 import os
 import random
 from dataclasses import astuple, dataclass
@@ -44,13 +45,11 @@ class PatchDataset(Dataset):  # type: ignore[misc]
         return patch
 
 
-class TestDataset(Dataset):  # type: ignore[misc]
+class MultitileDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
         image_folder: str,
-        patch_size: int = 518,
-        stride: int = 259,
-        use_pad: bool = False,
+        scale: float = 2.0,
     ) -> None:
         self.image_folder = image_folder
         self.image_paths = [
@@ -61,9 +60,7 @@ class TestDataset(Dataset):  # type: ignore[misc]
             for f in os.listdir(image_folder)
         ]
         self.transform = ttransforms.ToTensor()
-        self.use_pad = use_pad
-        self.patch_size = patch_size
-        self.stride = stride
+        self.scale = scale
 
     def __len__(self) -> int:
         return len(self.image_paths)
@@ -78,27 +75,22 @@ class TestDataset(Dataset):  # type: ignore[misc]
 
         h, w = image.shape[-2:]
 
-        if self.use_pad:
-            pad = compute_padding(
-                original_size=(
-                    h,
-                    w,
-                ),
-                window_size=self.patch_size,
-                stride=self.stride,
-            )
-            patches = extract_tensor_patches(
-                image,
-                self.patch_size,
-                self.stride,
-                padding=pad,
-            )
-        else:
-            patches = extract_tensor_patches(
-                image,
-                self.patch_size,
-                self.stride,
-            )
+        window_size = (math.ceil(h / self.scale), math.ceil(w / self.scale))
+
+        pad = compute_padding(
+            original_size=(
+                h,
+                w,
+            ),
+            window_size=window_size,
+            stride=window_size,
+        )
+        patches = extract_tensor_patches(
+            image,
+            window_size=window_size,
+            stride=window_size,
+            padding=pad,
+        )
 
         return (
             patches,

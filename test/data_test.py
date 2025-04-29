@@ -2,6 +2,7 @@ import torch
 
 from src.data import (
     ConcatenatedDataset,
+    MultitileDataset,
     NonPlantDataset,
     PlantDataset,
     get_image_paths,
@@ -110,3 +111,17 @@ def test_combine_species_threshold() -> None:
         assert all(count > threshold for count in class_counts.values()), (
             "Some classes have less than 2 samples"
         )
+
+
+TEST_FILE_DIR = "/mnt/storage1/shared_data/plant_clef_2025/data/plant_clef_2025_test/"
+
+
+def test_test_dataset() -> None:
+    for scale in [1, 2, 5, 9]:
+        test_dataset = MultitileDataset(
+            image_folder=TEST_FILE_DIR,
+            scale=scale,
+        )
+        assert len(test_dataset) > 0, "Test dataset is empty"
+        patches, image_path = test_dataset[0]
+        assert patches.shape[-4] == scale**2

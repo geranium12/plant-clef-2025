@@ -102,15 +102,13 @@ def pipeline(
     )
 
     submission_dataloader = DataLoader(
-        dataset=data.TestDataset(
+        dataset=data.MultitileDataset(
             image_folder=os.path.join(
                 config.project_path,
                 config.data.folder,
                 config.data.test_folder,
             ),
-            patch_size=model_info.input_size,
-            stride=int(model_info.input_size / 2),
-            use_pad=True,
+            scale=2,
         ),
         batch_size=1,  # config.training.batch_size, TODO: FIX
         num_workers=config.training.num_workers,
