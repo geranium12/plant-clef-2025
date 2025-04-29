@@ -154,7 +154,7 @@ def predict_all(
     species_mapping = pd.read_csv(
         os.path.join(
             folder_path,
-            "species_ids.csv",
+            config.data.utils.species_mapping,
         ),
         index_col=False,
     )
