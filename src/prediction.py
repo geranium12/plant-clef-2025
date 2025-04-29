@@ -144,6 +144,7 @@ def predict_all(
     min_score: float,
     accelerator: Accelerator,
     config: DictConfig,
+    use_genus_and_family: bool = True,
 ) -> dict[str, list[int]]:
     image_predictions: dict[str, list[int]] = {}
 
@@ -255,11 +256,14 @@ def predict_all(
                         outputs["logits_family"], dim=1
                     )
 
-                    probabilities = (
-                        probabilities_species
-                        * probabilities_genus[species_to_genus]
-                        * probabilities_family[species_to_family]
-                    )
+                    if use_genus_and_family:
+                        probabilities = (
+                            probabilities_species
+                            * probabilities_genus[species_to_genus]
+                            * probabilities_family[species_to_family]
+                        )
+                    else:
+                        probabilities = probabilities_species
 
                     # Get the top-k indices and probabilities
                     (
