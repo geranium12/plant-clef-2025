@@ -22,8 +22,6 @@ from src.utils import family_name_to_id, genus_name_to_id, species_id_to_name
 from utils.build_hierarchies import (
     check_utils_folder,
     get_genus_family_from_species,
-    get_organ_number,
-    get_plant_tree_number,
     read_plant_taxonomy,
 )
 
