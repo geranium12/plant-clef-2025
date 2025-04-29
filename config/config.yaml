@@ -66,6 +66,18 @@ evaluating:
   num_workers: 8
   test_enabled: true # if true, evaluate on the test set
 
+prediction:
+  tiling:
+    scales:
+      - 1.0
+      - 2.0
+      - 5.0
+    overlaps:
+      - 0.0
+      - 0.5
+      - 0.25
+
+
 image_width: 518
 image_height: 518
 
