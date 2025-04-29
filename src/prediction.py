@@ -97,16 +97,16 @@ def predict(
         ]
     )
 
-    species_to_genus = []
-    species_to_family = []
+    species_to_genus_list = []
+    species_to_family_list = []
     for _, (genus, family) in species_to_other:
         gid = genus_name_to_id(genus, genus_mapping)
         fid = family_name_to_id(family, family_mapping)
-        species_to_genus.append(gid)
-        species_to_family.append(fid)
+        species_to_genus_list.append(gid)
+        species_to_family_list.append(fid)
 
-    species_to_genus = torch.Tensor(species_to_genus, dtype=int)
-    species_to_family = torch.Tensor(species_to_family, dtype=int)
+    species_to_genus = torch.tensor(species_to_genus_list, dtype=torch.int64)
+    species_to_family = torch.tensor(species_to_family_list, dtype=torch.int64)
 
     # Initialize batch time tracking
     batch_time = AverageMeter()
@@ -149,11 +149,26 @@ def predict(
                         outputs["logits_family"], dim=1
                     )
 
+                    species_to_genus = species_to_genus.to(probabilities_species.device)
+                    species_to_family = species_to_family.to(
+                        probabilities_species.device
+                    )
+
                     if config.prediction.use_genus_and_family:
+                        genus_probs = probabilities_genus.gather(
+                            1,
+                            species_to_genus.unsqueeze(0).expand(
+                                probabilities_species.shape[0], -1
+                            ),
+                        )
+                        family_probs = probabilities_family.gather(
+                            1,
+                            species_to_family.unsqueeze(0).expand(
+                                probabilities_species.shape[0], -1
+                            ),
+                        )
                         probabilities = (
-                            probabilities_species
-                            * probabilities_genus[species_to_genus]
-                            * probabilities_family[species_to_family]
+                            probabilities_species * genus_probs * family_probs
                         )
                     else:
                         probabilities = probabilities_species
