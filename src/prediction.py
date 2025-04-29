@@ -4,14 +4,9 @@ import time
 import numpy as np
 import pandas as pd
 import torch
-
-from omegaconf import DictConfig
-
-from utils.build_hierarchies import read_plant_taxonomy
-
-import torch
 import torchvision.transforms as ttransforms
 from accelerate import Accelerator
+from omegaconf import DictConfig
 from torch.amp import autocast
 from torch.utils.data import (
     DataLoader,
@@ -19,25 +14,19 @@ from torch.utils.data import (
 
 from src.data import (
     PatchDataset,
+    get_plant_data_image_info,
 )
 from src.training import (
     ModelInfo,
 )
-
+from src.utils import family_name_to_id, genus_name_to_id, species_id_to_name
 from utils.build_hierarchies import (
+    check_utils_folder,
+    get_genus_family_from_species,
     get_organ_number,
     get_plant_tree_number,
     read_plant_taxonomy,
-    check_utils_folder,
-    get_genus_family_from_species,
 )
-from src.utils import (
-    species_id_to_name,
-    genus_name_to_id,
-    family_name_to_id
-)
-
-
 
 
 class AverageMeter:
@@ -147,6 +136,7 @@ def predict(
 
     return image_predictions
 
+
 def predict_all(
     dataloader: DataLoader,
     model: torch.nn.Module,
@@ -156,24 +146,24 @@ def predict_all(
     class_map: dict[int, int],
     min_score: float,
     accelerator: Accelerator,
-    config: DictConfig
+    config: DictConfig,
 ) -> dict[str, list[int]]:
     image_predictions: dict[str, list[int]] = {}
-    
+
     plant_tree = read_plant_taxonomy(config)
-    
+
     folder_path = check_utils_folder(config)
-    
+
     species_mapping = pd.read_csv(
-                os.path.join(
+        os.path.join(
             folder_path,
-                    'species_ids.csv',
+            "species_ids.csv",
         ),
         index_col=False,
     )
 
     genus_mapping = pd.read_csv(
-                os.path.join(
+        os.path.join(
             folder_path,
             config.data.utils.genus_mapping,
         ),
@@ -187,8 +177,8 @@ def predict_all(
         ),
         index_col=False,
     )
-    
-    plant_data_image_info = data.get_plant_data_image_info(
+
+    plant_data_image_info = get_plant_data_image_info(
         os.path.join(
             config.project_path,
             config.data.folder,
@@ -196,7 +186,7 @@ def predict_all(
         ),
         combine_classes_threshold=config.data.combine_classes_threshold,
     )
-    
+
     species_id_to_index = {
         sid: idx
         for idx, sid in enumerate(
@@ -204,10 +194,17 @@ def predict_all(
         )
     }
 
-    species_to_other = sorted([
-        (species_index, get_genus_family_from_species(plant_tree, species_id_to_name(species_id, species_mapping)))
-        for species_id, species_index in species_id_to_index.items()
-    ])
+    species_to_other = sorted(
+        [
+            (
+                species_index,
+                get_genus_family_from_species(
+                    plant_tree, species_id_to_name(species_id, species_mapping)
+                ),
+            )
+            for species_id, species_index in species_id_to_index.items()
+        ]
+    )
 
     species_to_genus = []
     species_to_family = []
@@ -217,10 +214,9 @@ def predict_all(
         species_to_genus.append(gid)
         species_to_family.append(fid)
 
-
     species_to_genus = torch.Tensor(species_to_genus, dtype=int)
     species_to_family = torch.Tensor(species_to_family, dtype=int)
-    
+
     # Initialize batch time tracking
     batch_time = AverageMeter()
     end = time.time()
@@ -255,19 +251,18 @@ def predict_all(
                     )
 
                     probabilities_genus = torch.nn.functional.softmax(
-                        outputs["logits_genus"],
-                        dim=1
+                        outputs["logits_genus"], dim=1
                     )
 
                     probabilities_family = torch.nn.functional.softmax(
-                        outputs["logits_family"],
-                        dim=1
+                        outputs["logits_family"], dim=1
                     )
 
-                    probabilities = probabilities_species \
-                        * probabilities_genus[species_to_genus] \
+                    probabilities = (
+                        probabilities_species
+                        * probabilities_genus[species_to_genus]
                         * probabilities_family[species_to_family]
-
+                    )
 
                     # Get the top-k indices and probabilities
                     (
