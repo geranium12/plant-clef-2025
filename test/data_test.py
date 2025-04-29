@@ -116,12 +116,43 @@ def test_combine_species_threshold() -> None:
 TEST_FILE_DIR = "/mnt/storage1/shared_data/plant_clef_2025/data/plant_clef_2025_test/"
 
 
-def test_test_dataset() -> None:
+def test_multitile_dataset_scale() -> None:
     for scale in [1, 2, 5, 9]:
-        test_dataset = MultitileDataset(
+        dataset = MultitileDataset(
             image_folder=TEST_FILE_DIR,
             scale=scale,
         )
-        assert len(test_dataset) > 0, "Test dataset is empty"
-        patches, image_path = test_dataset[0]
+        assert len(dataset) > 0, "Test dataset is empty"
+        patches, image_path = dataset[0]
         assert patches.shape[-4] == scale**2
+
+
+def test_multitile_dataset_overlap() -> None:
+    dataset = MultitileDataset(
+        image_folder=TEST_FILE_DIR,
+        scale=2,
+        overlap=0.5,
+    )
+    assert len(dataset) > 0, "Test dataset is empty"
+    patches, image_path = dataset[0]
+    assert patches.shape[-4] == 3**2
+
+
+def test_multitile_dataset_size() -> None:
+    dataset = MultitileDataset(
+        image_folder=TEST_FILE_DIR,
+        tile_size=100,
+    )
+    assert len(dataset) > 0, "Test dataset is empty"
+    patches, image_path = dataset[0]
+    assert patches.shape[-2:] == (100, 100)
+
+    dataset = MultitileDataset(
+        image_folder=TEST_FILE_DIR,
+        tile_size=518,
+        scale=2,
+        overlap=0.5,
+    )
+    assert len(dataset) > 0, "Test dataset is empty"
+    patches, image_path = dataset[0]
+    assert patches.shape[-2:] == (518, 518)

@@ -49,7 +49,9 @@ class MultitileDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
         image_folder: str,
+        tile_size: int = 518,
         scale: float = 2.0,
+        overlap: float = 0.0,
     ) -> None:
         self.image_folder = image_folder
         self.image_paths = [
@@ -61,6 +63,8 @@ class MultitileDataset(Dataset):  # type: ignore[misc]
         ]
         self.transform = ttransforms.ToTensor()
         self.scale = scale
+        self.overlap = overlap
+        self.tile_size = tile_size
 
     def __len__(self) -> int:
         return len(self.image_paths)
@@ -76,6 +80,10 @@ class MultitileDataset(Dataset):  # type: ignore[misc]
         h, w = image.shape[-2:]
 
         window_size = (math.ceil(h / self.scale), math.ceil(w / self.scale))
+        stride = (
+            math.ceil(window_size[0] * (1.0 - self.overlap)),
+            math.ceil(window_size[1] * (1.0 - self.overlap)),
+        )
 
         pad = compute_padding(
             original_size=(
@@ -83,13 +91,21 @@ class MultitileDataset(Dataset):  # type: ignore[misc]
                 w,
             ),
             window_size=window_size,
-            stride=window_size,
+            stride=stride,
         )
         patches = extract_tensor_patches(
             image,
             window_size=window_size,
-            stride=window_size,
+            stride=stride,
             padding=pad,
+        )
+
+        patches = patches.squeeze(0)
+        patches = torch.nn.functional.interpolate(
+            patches,
+            size=(self.tile_size, self.tile_size),
+            mode="bilinear",
+            align_corners=False,
         )
 
         return (
