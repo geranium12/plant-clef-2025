@@ -1,26 +1,26 @@
 # TODO
 
 #### Hanna
-- [x] Add eval to the pipeline
-- [x] Train 5 heads of the pre-trained kaggle model (only-classifier-then-all) on augmented data + non-plant datasets
-- [ ] Train the whole model (unfreeze the backbone) on augmented data + non-plant datasets
-- [x] Add accelerate
-- [x] Add checkpointing during training
-- [x] Add lr scheduler
-- [x] Integrate the LUCAS no labels dataset
 - [ ] Continue trainining the model on the LUCAS no labels dataset
+- [ ] Try to fix the plant bool head
+- [ ] Train 5 heads of the pre-trained kaggle model (only-classifier-then-all) on augmented data + non-plant datasets (submit it)
+- [ ] Train the whole model (unfreeze the backbone) on augmented data + non-plant datasets (submit it)
+- [ ] Train 5 heads ... with a threshold for low-resource classes (submit it)
+- [ ] Train the whole model ... with a threshold for low-resouce classes (submit it)
+- [ ] Implement FAISS knn on ALL different backbones
+- [ ] Experiment with top_k and threshold when you submit the solutions
+- [ ] Look at the Atlantic code and find how they used SAM (try to make it run for our case)
 
 #### Robin
-- [x] Combine low-resource data classes
-- [ ] Figure out what DS@GT does for this challenge
-- [x] Submit a model (no train) to test our pipeline
+- [ ] Implement multi-scale tiling for inference
+- [ ] Implement "top genus" filter for inference
+- [ ] Implement Bayesian Model Averaging or find a similar voting/pooling technique for inference
 
 #### Tomo
 - [ ] Use trees for eval on multiplication of possible options
-- [ ] Implement multi-scale tiling for inference
+- [ ] Create a model (Random Forest, basic grey pixels calculation, CNN, PCA, etc.) that classifies plant/non-plant images
 
 ## Later TODO
-- [ ] Finetune ViT Large on plant data (not reasonable?)
 
 ## Done
 - [x] Set up hydra
@@ -37,3 +37,11 @@
 - [x] Add non-plant datasets (download + to the code)
 - [x] Implement data augmentation (tiling, color change, rotation, ...)
 - [x] Resplit the training data
+- [x] Combine low-resource data classes
+- [x] Figure out what DS@GT does for this challenge
+- [x] Submit a model (no train) to test our pipeline
+- [x] Add eval to the pipeline
+- [x] Add accelerate
+- [x] Add checkpointing during training
+- [x] Add lr scheduler
+- [x] Integrate the LUCAS no labels dataset

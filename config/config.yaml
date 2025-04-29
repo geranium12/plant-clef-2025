@@ -78,6 +78,9 @@ prediction:
       - 0.25
 
 
+prediction:
+  use_genus_and_family: true
+
 image_width: 518
 image_height: 518
 
