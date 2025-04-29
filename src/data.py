@@ -50,8 +50,8 @@ class MultitileDataset(Dataset):  # type: ignore[misc]
         self,
         image_folder: str,
         tile_size: int = 518,
-        scale: float = 2.0,
-        overlap: float = 0.0,
+        scales: list[float] | None = None,
+        overlaps: list[float] | None = None,
     ) -> None:
         self.image_folder = image_folder
         self.image_paths = [
@@ -62,8 +62,12 @@ class MultitileDataset(Dataset):  # type: ignore[misc]
             for f in os.listdir(image_folder)
         ]
         self.transform = ttransforms.ToTensor()
-        self.scale = scale
-        self.overlap = overlap
+
+        self.scales = scales if scales is not None else [1.0]
+        self.overlaps = overlaps if overlaps is not None else [0.0]
+        assert len(self.scales) == len(self.overlaps), (
+            "Same number of scales and overlaps should be provided"
+        )
         self.tile_size = tile_size
 
     def __len__(self) -> int:
@@ -78,40 +82,35 @@ class MultitileDataset(Dataset):  # type: ignore[misc]
             image = self.transform(image).unsqueeze(0)
 
         h, w = image.shape[-2:]
+        patches_list = []
+        for scale, overlap in zip(self.scales, self.overlaps):
+            window_size = (math.ceil(h / scale), math.ceil(w / scale))
+            stride = (
+                math.ceil(window_size[0] * (1.0 - overlap)),
+                math.ceil(window_size[1] * (1.0 - overlap)),
+            )
+            pad = compute_padding(
+                original_size=(h, w),
+                window_size=window_size,
+                stride=stride,
+            )
+            patches = extract_tensor_patches(
+                image,
+                window_size=window_size,
+                stride=stride,
+                padding=pad,
+            )
+            patches = patches.squeeze(0)
+            patches = torch.nn.functional.interpolate(
+                patches,
+                size=(self.tile_size, self.tile_size),
+                mode="bilinear",
+                align_corners=False,
+            )
+            patches_list.append(patches)
 
-        window_size = (math.ceil(h / self.scale), math.ceil(w / self.scale))
-        stride = (
-            math.ceil(window_size[0] * (1.0 - self.overlap)),
-            math.ceil(window_size[1] * (1.0 - self.overlap)),
-        )
-
-        pad = compute_padding(
-            original_size=(
-                h,
-                w,
-            ),
-            window_size=window_size,
-            stride=stride,
-        )
-        patches = extract_tensor_patches(
-            image,
-            window_size=window_size,
-            stride=stride,
-            padding=pad,
-        )
-
-        patches = patches.squeeze(0)
-        patches = torch.nn.functional.interpolate(
-            patches,
-            size=(self.tile_size, self.tile_size),
-            mode="bilinear",
-            align_corners=False,
-        )
-
-        return (
-            patches,
-            image_path,
-        )
+        all_patches = torch.cat(patches_list, dim=0)
+        return (all_patches, image_path)
 
 
 @dataclass

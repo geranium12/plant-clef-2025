@@ -109,8 +109,8 @@ def pipeline(
                 config.data.test_folder,
             ),
             tile_size=model_info.input_size,
-            scale=2,
-            overlap=0.5,
+            scales=[4],
+            overlaps=[0.5],
         ),
         batch_size=1,  # config.training.batch_size, TODO: FIX
         num_workers=config.training.num_workers,
