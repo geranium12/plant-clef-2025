@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 
 import pandas as pd
 import timm
@@ -8,6 +9,13 @@ from accelerate import Accelerator
 from omegaconf import DictConfig
 
 import wandb
+
+
+@dataclass
+class ModelInfo:
+    input_size: int
+    mean: float
+    std: float
 
 
 def load_model(config: DictConfig, num_classes: int) -> nn.Module:

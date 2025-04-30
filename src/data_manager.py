@@ -1,7 +1,9 @@
 import os
 from dataclasses import dataclass
+from typing import Any
 
 import pandas as pd
+import timm
 import torch
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader, Dataset
@@ -35,6 +37,7 @@ class DataManager:
     non_plant_data_split: DataSplit | None
     df_metadata: pd.DataFrame
     species_id_to_idx: dict[int, int]
+    data_config: dict[str, Any]
 
     def __post_init__(self) -> None:
         self._load_mappings_and_taxonomy()
@@ -83,6 +86,13 @@ class DataManager:
                     plant_data_image_info=self.plant_data_image_info,
                     image_size=image_size,
                     indices=plant_indices,
+                    transform=timm.data.create_transform(
+                        **self.data_config, is_training=True
+                    )
+                    if split_type == "train" or plant_indices is None
+                    else timm.data.create_transform(
+                        **self.data_config, is_training=False
+                    ),
                 )
             )
         if (
@@ -93,6 +103,13 @@ class DataManager:
                     image_folder=image_folder_other,
                     image_size=image_size,
                     indices=non_plant_indices,
+                    transform=timm.data.create_transform(
+                        **self.data_config, is_training=True
+                    )
+                    if split_type == "train" or plant_indices is None
+                    else timm.data.create_transform(
+                        **self.data_config, is_training=False
+                    ),
                 )
             )
 

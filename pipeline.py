@@ -1,6 +1,7 @@
 import os
 
 import hydra
+import timm
 from accelerate import Accelerator
 from omegaconf import (
     DictConfig,
@@ -11,7 +12,7 @@ from torch.utils.data import DataLoader
 import src.data as data
 from src import prediction, submission, training
 from src.data_manager import DataManager
-from src.utils import define_metrics, load_model
+from src.utils import ModelInfo, define_metrics, load_model
 from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 from utils.build_hierarchies import (
     get_organ_number,
@@ -81,7 +82,15 @@ def pipeline(
         num_labels_plant=1,
         num_labels_species=len(species_id_to_index),
     )
-    print(model)
+    accelerator.print(model)
+
+    data_config = timm.data.resolve_model_data_config(model)
+    model_info = ModelInfo(
+        input_size=data_config["input_size"][1],  # Assuming (C, H, W)
+        mean=data_config["mean"],
+        std=data_config["std"],
+    )
+    accelerator.print(f"Model info: {model_info}")
 
     # Initialize data management
     data_manager = DataManager(
@@ -91,9 +100,10 @@ def pipeline(
         non_plant_data_split=non_plant_data_split,
         df_metadata=df_metadata,
         species_id_to_idx=species_id_to_index,
+        data_config=data_config,
     )
 
-    model, model_info = training.train(
+    model = training.train(
         model=model,
         data_manager=data_manager,
         config=config,
@@ -121,13 +131,13 @@ def pipeline(
         config=config,
         dataloader=submission_dataloader,
         model=model,
-        model_info=model_info,
         batch_size=config.training.batch_size,
         top_k_tile=config.training.top_k_tile,
         species_index_to_id=species_index_to_id,
         species_id_to_index=species_id_to_index,
         min_score=config.training.min_score,
         accelerator=accelerator,
+        transform_patch=timm.data.create_transform(**data_config, is_training=False),
     )
 
     submission.submit(

@@ -1,7 +1,5 @@
 import os
-from dataclasses import dataclass
 
-import timm
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,13 +11,6 @@ import src.augmentation
 from src.data_manager import DataManager
 from src.evaluating import Evaluator
 from src.utils import calculate_total_loss, log_loss
-
-
-@dataclass
-class ModelInfo:
-    input_size: int
-    mean: float
-    std: float
 
 
 class Trainer:
@@ -184,7 +175,7 @@ def train(
     data_manager: DataManager,
     config: DictConfig,
     accelerator: Accelerator,
-) -> tuple[torch.nn.Module, ModelInfo]:
+) -> torch.nn.Module:
     """
     Main function to set up and run the training and final testing process.
 
@@ -255,12 +246,4 @@ def train(
     for key, value in test_results.items():
         accelerator.print(f"- {key}: {value:.4f}")
 
-    data_config = timm.data.resolve_model_data_config(unwrapped_model)
-    model_info = ModelInfo(
-        input_size=data_config["input_size"][1],  # Assuming (C, H, W)
-        mean=data_config["mean"],
-        std=data_config["std"],
-    )
-    accelerator.print(f"Model info: {model_info}")
-
-    return unwrapped_model, model_info
+    return unwrapped_model

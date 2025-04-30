@@ -12,10 +12,11 @@ from torch.utils.data import (
 )
 
 from src.data import PatchDataset
-from src.training import (
-    ModelInfo,
+from src.utils import (
+    family_name_to_id,
+    genus_name_to_id,
+    species_id_to_name,
 )
-from src.utils import family_name_to_id, genus_name_to_id, species_id_to_name
 from utils.build_hierarchies import (
     check_utils_folder,
     get_genus_family_from_species,
@@ -47,13 +48,13 @@ def predict(
     config: DictConfig,
     dataloader: DataLoader,
     model: torch.nn.Module,
-    model_info: ModelInfo,
     batch_size: int,
     top_k_tile: int,
     species_index_to_id: dict[int, int],
     species_id_to_index: dict[int, int],
     min_score: float,
     accelerator: Accelerator,
+    transform_patch: ttransforms.transforms,
 ) -> dict[str, list[int]]:
     image_predictions: dict[str, list[int]] = {}
 
@@ -119,10 +120,7 @@ def predict(
         ) in enumerate(dataloader):
             image_results: dict[int, float] = {}
             quadrat_id = os.path.splitext(os.path.basename(image_path[0]))[0]
-            transform_patch = ttransforms.Normalize(
-                mean=model_info.mean,
-                std=model_info.std,
-            )
+
             patch_dataset = PatchDataset(
                 patches[0],
                 transform=transform_patch,
