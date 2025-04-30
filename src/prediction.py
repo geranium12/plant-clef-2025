@@ -43,6 +43,42 @@ class AverageMeter:
         self.avg = self.sum / self.count
 
 
+def top_k_tile_prediction(
+    tiles_probabilities: torch.Tensor,
+    species_index_to_id: dict[int, int],
+    top_k_tile: int,
+    min_score: float,
+) -> dict[int, float]:
+    image_results: dict[int, float] = {}
+
+    # Get the top-k indices and probabilities
+    (
+        top_probs,
+        top_indices,
+    ) = torch.topk(
+        tiles_probabilities,
+        top_k_tile,
+    )
+    top_probs = top_probs.cpu().numpy()
+    top_indices = top_indices.cpu().numpy()
+
+    for (
+        top_tile_indices,
+        top_tile_probs,
+    ) in zip(top_indices, top_probs):
+        for (
+            top_idx,
+            top_prob,
+        ) in zip(top_tile_indices, top_tile_probs):
+            species_id = species_index_to_id[top_idx]
+            # Update the results dictionary only if the probability is higher
+            if top_prob > min_score:
+                if top_idx not in image_results or image_results[species_id] < top_prob:
+                    image_results[species_id] = top_prob
+
+    return image_results
+
+
 def predict(
     config: DictConfig,
     dataloader: DataLoader,
@@ -117,7 +153,6 @@ def predict(
             patches,
             image_path,
         ) in enumerate(dataloader):
-            image_results: dict[int, float] = {}
             quadrat_id = os.path.splitext(os.path.basename(image_path[0]))[0]
             transform_patch = ttransforms.Normalize(
                 mean=model_info.mean,
@@ -132,6 +167,8 @@ def predict(
                 batch_size=batch_size,
                 shuffle=False,
             )
+
+            image_tile_probabilities: torch.Tensor = None
 
             for batch_patches in patch_loader:
                 with autocast("cuda"):
@@ -173,33 +210,18 @@ def predict(
                     else:
                         probabilities = probabilities_species
 
-                    # Get the top-k indices and probabilities
-                    (
-                        top_probs,
-                        top_indices,
-                    ) = torch.topk(
-                        probabilities,
-                        top_k_tile,
+                    image_tile_probabilities = (
+                        probabilities
+                        if image_tile_probabilities is None
+                        else torch.cat((image_tile_probabilities, probabilities), dim=0)
                     )
-                    top_probs = top_probs.cpu().numpy()
-                    top_indices = top_indices.cpu().numpy()
 
-                    for (
-                        top_tile_indices,
-                        top_tile_probs,
-                    ) in zip(top_indices, top_probs):
-                        for (
-                            top_idx,
-                            top_prob,
-                        ) in zip(top_tile_indices, top_tile_probs):
-                            species_id = species_index_to_id[top_idx]
-                            # Update the results dictionary only if the probability is higher
-                            if top_prob > min_score:
-                                if (
-                                    top_idx not in image_results
-                                    or image_results[species_id] < top_prob
-                                ):
-                                    image_results[species_id] = top_prob
+            image_results = top_k_tile_prediction(
+                image_tile_probabilities,
+                species_index_to_id,
+                top_k_tile,
+                min_score,
+            )
 
             if config.prediction.filter_genus:
                 # Predict only the top species per genus
