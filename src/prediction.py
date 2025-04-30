@@ -200,6 +200,22 @@ def predict(
                                     or image_results[top_idx] < top_prob
                                 ):
                                     image_results[species_id] = top_prob
+
+            if config.prediction.filter_genus:
+                # Predict only the top species per genus
+                filtered_results: dict[int, tuple[int, float]] = {}
+                for species_id, prob in image_results.items():
+                    species_idx = species_id_to_index[species_id]
+                    genus_id = species_to_genus[species_idx].item()
+                    if (
+                        genus_id not in filtered_results
+                        or prob > filtered_results[genus_id][1]
+                    ):
+                        filtered_results[genus_id] = (species_id, prob)
+                image_results = {
+                    species_id: prob for species_id, prob in filtered_results.values()
+                }
+
             # store the prediction
             image_predictions[quadrat_id] = list(image_results.keys())
 
