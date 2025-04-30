@@ -197,7 +197,7 @@ def predict(
                             if top_prob > min_score:
                                 if (
                                     top_idx not in image_results
-                                    or image_results[top_idx] < top_prob
+                                    or image_results[species_id] < top_prob
                                 ):
                                     image_results[species_id] = top_prob
 
