@@ -32,14 +32,14 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore
             num_labels_species is None
             or num_labels_species == self.backbone.head.out_features
         ):
-            self.classifier_species = nn.Sequential(
-                *(
+            self.classifier_species = (
+                nn.Sequential(
                     nn.Linear(hidden_size, hidden_size),
                     nn.GELU(),
                     deepcopy(self.backbone.head),
                 )
                 if not freeze_species_head
-                else deepcopy(self.backbone.head)
+                else nn.Sequential(deepcopy(self.backbone.head))
             )
             # Replace the backbone head with an identity function
             self.backbone.head = nn.Identity()

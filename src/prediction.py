@@ -79,16 +79,47 @@ def top_k_tile_prediction(
     return image_results
 
 
+def bma_prediction(
+    tiles_probabilities: torch.Tensor,
+    species_index_to_id: dict[int, int],
+    z_score_threshold: float,
+) -> dict[int, float]:
+    # From "Patch-wise Inference using Pre-trained Vision Transformers: NEUON Submission to PlantCLEF 2024" Figure 8
+    d = tiles_probabilities.shape[1]
+
+    ss = (
+        1
+        / (d - 1)
+        * torch.sum(
+            (tiles_probabilities - tiles_probabilities.mean(dim=1, keepdim=True)) ** 2,
+            dim=1,
+        )
+    )
+    var = torch.abs(torch.log10(ss))
+    confidence = torch.sqrt((torch.max(var) + 0.5 - var) / (torch.max(var) + 0.5))
+    p_i_d = confidence / torch.sum(confidence, dim=0, keepdim=True)
+    weighted_probabilities = tiles_probabilities * p_i_d.unsqueeze(1)
+    image_probabilities = torch.sum(weighted_probabilities, dim=0)
+
+    z_scores = (
+        image_probabilities - torch.mean(image_probabilities, dim=0)
+    ) / torch.std(image_probabilities, dim=0)
+
+    return {
+        species_index_to_id[idx]: prob
+        for idx, prob in enumerate(image_probabilities)
+        if z_scores[idx] > z_score_threshold
+    }
+
+
 def predict(
     config: DictConfig,
     dataloader: DataLoader,
     model: torch.nn.Module,
     model_info: ModelInfo,
     batch_size: int,
-    top_k_tile: int,
     species_index_to_id: dict[int, int],
     species_id_to_index: dict[int, int],
-    min_score: float,
     accelerator: Accelerator,
 ) -> dict[str, list[int]]:
     image_predictions: dict[str, list[int]] = {}
@@ -216,12 +247,25 @@ def predict(
                         else torch.cat((image_tile_probabilities, probabilities), dim=0)
                     )
 
-            image_results = top_k_tile_prediction(
-                image_tile_probabilities,
-                species_index_to_id,
-                top_k_tile,
-                min_score,
-            )
+            image_results: dict[int, float] = {}
+            match config.prediction.method:
+                case "top_k_tile":
+                    image_results = top_k_tile_prediction(
+                        image_tile_probabilities,
+                        species_index_to_id,
+                        top_k_tile=config.prediction.top_k_tile.k,
+                        min_score=config.prediction.top_k_tile.min_score,
+                    )
+                case "BMA":
+                    image_results = bma_prediction(
+                        image_tile_probabilities,
+                        species_index_to_id,
+                        z_score_threshold=config.prediction.BMA.z_score_threshold,
+                    )
+                case _:
+                    raise ValueError(
+                        f"Unknown prediction method: {config.prediction.method}"
+                    )
 
             if config.prediction.filter_genus:
                 # Predict only the top species per genus
