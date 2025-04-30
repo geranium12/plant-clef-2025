@@ -1,19 +1,25 @@
 import os
 import time
 
+import pandas as pd
 import torch
 import torchvision.transforms as ttransforms
 from accelerate import Accelerator
+from omegaconf import DictConfig
 from torch.amp import autocast
 from torch.utils.data import (
     DataLoader,
 )
 
-from src.data import (
-    PatchDataset,
-)
+from src.data import PatchDataset
 from src.training import (
     ModelInfo,
+)
+from src.utils import family_name_to_id, genus_name_to_id, species_id_to_name
+from utils.build_hierarchies import (
+    check_utils_folder,
+    get_genus_family_from_species,
+    read_plant_taxonomy,
 )
 
 
@@ -38,16 +44,69 @@ class AverageMeter:
 
 
 def predict(
+    config: DictConfig,
     dataloader: DataLoader,
     model: torch.nn.Module,
     model_info: ModelInfo,
     batch_size: int,
     top_k_tile: int,
-    class_map: dict[int, int],
+    species_index_to_id: dict[int, int],
+    species_id_to_index: dict[int, int],
     min_score: float,
     accelerator: Accelerator,
 ) -> dict[str, list[int]]:
     image_predictions: dict[str, list[int]] = {}
+
+    plant_tree = read_plant_taxonomy(config)
+
+    folder_path = check_utils_folder(config)
+
+    species_mapping = pd.read_csv(
+        os.path.join(
+            folder_path,
+            config.data.utils.species_mapping,
+        ),
+        index_col=False,
+    )
+
+    genus_mapping = pd.read_csv(
+        os.path.join(
+            folder_path,
+            config.data.utils.genus_mapping,
+        ),
+        index_col=False,
+    )
+
+    family_mapping = pd.read_csv(
+        os.path.join(
+            folder_path,
+            config.data.utils.family_mapping,
+        ),
+        index_col=False,
+    )
+
+    species_to_other = sorted(
+        [
+            (
+                species_index,
+                get_genus_family_from_species(
+                    plant_tree, species_id_to_name(species_id, species_mapping)
+                ),
+            )
+            for species_id, species_index in species_id_to_index.items()
+        ]
+    )
+
+    species_to_genus_list = []
+    species_to_family_list = []
+    for _, (genus, family) in species_to_other:
+        gid = genus_name_to_id(genus, genus_mapping)
+        fid = family_name_to_id(family, family_mapping)
+        species_to_genus_list.append(gid)
+        species_to_family_list.append(fid)
+
+    species_to_genus = torch.tensor(species_to_genus_list, dtype=torch.int64)
+    species_to_family = torch.tensor(species_to_family_list, dtype=torch.int64)
 
     # Initialize batch time tracking
     batch_time = AverageMeter()
@@ -77,10 +136,42 @@ def predict(
             for batch_patches in patch_loader:
                 with autocast("cuda"):
                     outputs = model(batch_patches)  # Perform inference on the batch
-                    probabilities = torch.nn.functional.softmax(
+                    probabilities_species = torch.nn.functional.softmax(
                         outputs["logits_species"],
                         dim=1,
                     )
+
+                    probabilities_genus = torch.nn.functional.softmax(
+                        outputs["logits_genus"], dim=1
+                    )
+
+                    probabilities_family = torch.nn.functional.softmax(
+                        outputs["logits_family"], dim=1
+                    )
+
+                    species_to_genus = species_to_genus.to(probabilities_species.device)
+                    species_to_family = species_to_family.to(
+                        probabilities_species.device
+                    )
+
+                    if config.prediction.use_genus_and_family:
+                        genus_probs = probabilities_genus.gather(
+                            1,
+                            species_to_genus.unsqueeze(0).expand(
+                                probabilities_species.shape[0], -1
+                            ),
+                        )
+                        family_probs = probabilities_family.gather(
+                            1,
+                            species_to_family.unsqueeze(0).expand(
+                                probabilities_species.shape[0], -1
+                            ),
+                        )
+                        probabilities = (
+                            probabilities_species * genus_probs * family_probs
+                        )
+                    else:
+                        probabilities = probabilities_species
 
                     # Get the top-k indices and probabilities
                     (
@@ -101,7 +192,7 @@ def predict(
                             top_idx,
                             top_prob,
                         ) in zip(top_tile_indices, top_tile_probs):
-                            species_id = class_map[top_idx]
+                            species_id = species_index_to_id[top_idx]
                             # Update the results dictionary only if the probability is higher
                             if top_prob > min_score:
                                 if (
