@@ -1,7 +1,7 @@
 # TODO
 
 #### Hanna
-- [ ] Continue trainining the model on the LUCAS no labels dataset
+- [x] Continue trainining the model on the LUCAS no labels dataset
 - [ ] Try to fix the plant bool head
 - [ ] Train 5 heads of the pre-trained kaggle model (only-classifier-then-all) on augmented data + non-plant datasets (submit it)
 - [ ] Train the whole model (unfreeze the backbone) on augmented data + non-plant datasets (submit it)
@@ -17,7 +17,7 @@
 - [ ] Implement Bayesian Model Averaging or find a similar voting/pooling technique for inference
 
 #### Tomo
-- [ ] Use trees for eval on multiplication of possible options
+- [x] Use trees for eval on multiplication of possible options
 - [ ] Create a model (Random Forest, basic grey pixels calculation, CNN, PCA, etc.) that classifies plant/non-plant images
 
 ## Later TODO
