@@ -620,7 +620,7 @@ def main(args, save_path):
         "model-only-classifier-then-all-bs32-ep100-lr1e-3-lucas_model_0074999.pth"
     )
 
-    torch.save(model.state_dict(), os.path.join(save_path, save_name))
+    torch.save(timm_model.state_dict(), os.path.join(save_path, save_name))
 
 
 if __name__ == "__main__":
