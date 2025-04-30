@@ -119,12 +119,14 @@ def pipeline(
     submission_dataloader = accelerator.prepare(submission_dataloader)
 
     image_predictions = prediction.predict(
+        config=config,
         dataloader=submission_dataloader,
         model=model,
         model_info=model_info,
         batch_size=config.training.batch_size,
         top_k_tile=config.training.top_k_tile,
-        class_map=species_index_to_id,
+        species_index_to_id=species_index_to_id,
+        species_id_to_index=species_id_to_index,
         min_score=config.training.min_score,
         accelerator=accelerator,
     )
