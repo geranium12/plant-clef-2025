@@ -25,7 +25,7 @@ data:
     species_mapping: "species_names.csv"
   other:
     folder: "other/"
-  combine_classes_threshold: 0 # The minimum number of images required for a class the get its own label
+  combine_classes_threshold: 0 # The minimum number of images required for a class the get its own label # Currently not compatible with prediction.use_genus_and_family
 
 models:
   name: "vit_base_patch14_reg4_dinov2.lvd142m"
@@ -64,7 +64,7 @@ evaluating:
   num_workers: 8
 
 prediction:
-  use_genus_and_family: true
+  use_genus_and_family: true # if true, multiply probabilites of species, genus and family # Currently not compatible with data.combine_classes_threshold
 
 image_width: 518
 image_height: 518

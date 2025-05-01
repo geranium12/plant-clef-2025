@@ -93,7 +93,8 @@ def predict(
                     plant_tree, species_id_to_name(species_id, species_mapping)
                 ),
             )
-            for species_id, species_index in species_id_to_index.items()
+            for species_index, species_id in species_index_to_id.items()
+            if species_id != 0
         ]
     )
 
@@ -154,7 +155,10 @@ def predict(
                         probabilities_species.device
                     )
 
-                    if config.prediction.use_genus_and_family:
+                    if (
+                        config.prediction.use_genus_and_family
+                        and config.data.combine_classes_threshold == 0
+                    ):  # TODO: Make multiplication of probabilities compatible with combine_classes_threshold
                         genus_probs = probabilities_genus.gather(
                             1,
                             species_to_genus.unsqueeze(0).expand(
