@@ -2,7 +2,6 @@
 
 #### Hanna
 - [x] Continue trainining the model on the LUCAS no labels dataset
-- [ ] Try to fix the plant bool head
 - [ ] Train 5 heads of the pre-trained kaggle model (only-classifier-then-all) on augmented data + non-plant datasets (submit it)
 - [ ] Train the whole model (unfreeze the backbone) on augmented data + non-plant datasets (submit it)
 - [ ] Train 5 heads ... with a threshold for low-resource classes (submit it)
@@ -12,12 +11,8 @@
 - [ ] Look at the Atlantic code and find how they used SAM (try to make it run for our case)
 
 #### Robin
-- [ ] Implement multi-scale tiling for inference
-- [ ] Implement "top genus" filter for inference
-- [ ] Implement Bayesian Model Averaging or find a similar voting/pooling technique for inference
 
 #### Tomo
-- [x] Use trees for eval on multiplication of possible options
 - [ ] Create a model (Random Forest, basic grey pixels calculation, CNN, PCA, etc.) that classifies plant/non-plant images
 
 ## Later TODO
@@ -45,3 +40,8 @@
 - [x] Add checkpointing during training
 - [x] Add lr scheduler
 - [x] Integrate the LUCAS no labels dataset
+- [x] Implement multi-scale tiling for inference
+- [x] Implement "top genus" filter for inference
+- [x] Implement Bayesian Model Averaging or find a similar voting/pooling technique for inference
+- [x] Use trees for eval on multiplication of possible options
+
