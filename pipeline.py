@@ -10,7 +10,7 @@ from omegaconf import (
 from torch.utils.data import DataLoader
 
 import src.data as data
-from src import prediction, submission, training
+from src import augmentation, prediction, submission, training
 from src.data_manager import DataManager
 from src.utils import ModelInfo, define_metrics, load_model
 from src.vit_multi_head_classifier import ViTMultiHeadClassifier
@@ -120,6 +120,7 @@ def pipeline(
         df_metadata=df_metadata,
         species_id_to_idx=species_id_to_index,
         data_config=data_config,
+        random_transform=augmentation.get_random_data_augmentation(),
     )
 
     model = training.train(

@@ -50,10 +50,6 @@ class Trainer:
         images, species_labels, images_names = batch
         plant_labels = (species_labels != -1).clone().detach().to(dtype=torch.float32)
 
-        # Apply augmentation
-        augmentation = src.augmentation.get_random_data_augmentation(self.config)
-        images = augmentation(images)
-
         # Gather labels
         labels = self.data_manager.gather_all_labels(
             species_labels, plant_labels, images_names
