@@ -112,22 +112,20 @@ class ImageSampleInfo:
     image_path: str
 
 
-def _combine_rare_classes(samples: list[ImageSampleInfo], threshold: int) -> None:
+def _get_rare_classes(samples: list[ImageSampleInfo], threshold: int) -> set[int]:
     if threshold <= 0:
-        return
+        return set()
 
     counts: dict[int, int] = {}
     for sample in samples:
         counts[sample.species_id] = counts.get(sample.species_id, 0) + 1
 
-    for sample in samples:
-        if counts.get(sample.species_id, 0) <= threshold:
-            sample.species_id = 0
+    return {sid for sid, count in counts.items() if count <= threshold}
 
 
 def get_plant_data_image_info(
     image_folder: str, combine_classes_threshold: int = 0
-) -> list[ImageSampleInfo]:
+) -> tuple[list[ImageSampleInfo], set[int]]:
     valid_extensions = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
     samples: list[ImageSampleInfo] = []  # List of (class_name, image_path) pairs.
     for cls in sorted(os.listdir(image_folder)):
@@ -142,9 +140,9 @@ def get_plant_data_image_info(
                         ImageSampleInfo(species_id=int(cls), image_path=path)
                     )
 
-    _combine_rare_classes(samples, combine_classes_threshold)
+    rare_classes = _get_rare_classes(samples, combine_classes_threshold)
 
-    return samples
+    return samples, rare_classes
 
 
 def get_image_paths(image_folder: str) -> list[str]:
