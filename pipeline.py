@@ -27,7 +27,7 @@ def pipeline(
 ) -> None:
     df_metadata = data.load_metadata(config)
 
-    plant_data_image_info = data.get_plant_data_image_info(
+    plant_data_image_info, rare_species = data.get_plant_data_image_info(
         os.path.join(
             config.project_path,
             config.data.folder,
@@ -62,13 +62,31 @@ def pipeline(
     plant_tree = read_plant_taxonomy(config)
     _, num_labels_genus, num_labels_family = get_plant_tree_number(plant_tree)
 
-    species_id_to_index = {
-        sid: idx
-        for idx, sid in enumerate(
-            sorted({info.species_id for info in plant_data_image_info})
-        )
-    }
-    species_index_to_id = {idx: sid for sid, idx in species_id_to_index.items()}
+    if config.data.combine_classes_threshold > 0:
+        used_species_ids = {
+            info.species_id
+            for info in plant_data_image_info
+            if info.species_id not in rare_species
+        }
+        species_id_to_index = {
+            sid: idx + 1 for idx, sid in enumerate(sorted(used_species_ids))
+        }
+        for sid in rare_species:
+            species_id_to_index[sid] = 0
+        species_index_to_id = {
+            species_id_to_index[sid]: sid for sid in used_species_ids
+        }
+        assert 0 not in species_index_to_id
+        assert 0 not in species_id_to_index
+        species_index_to_id[0] = 0
+    else:
+        species_id_to_index = {
+            sid: idx
+            for idx, sid in enumerate(
+                sorted({info.species_id for info in plant_data_image_info})
+            )
+        }
+        species_index_to_id = {idx: sid for sid, idx in species_id_to_index.items()}
 
     model = load_model(
         config=config,
@@ -80,7 +98,8 @@ def pipeline(
         num_labels_genus=num_labels_genus,
         num_labels_family=num_labels_family,
         num_labels_plant=1,
-        num_labels_species=len(species_id_to_index),
+        num_labels_species=len(species_index_to_id),
+        freeze_species_head=config.models.freeze_species_head,
     )
     accelerator.print(model)
 
@@ -111,15 +130,15 @@ def pipeline(
     )
 
     submission_dataloader = DataLoader(
-        dataset=data.TestDataset(
+        dataset=data.MultitileDataset(
             image_folder=os.path.join(
                 config.project_path,
                 config.data.folder,
                 config.data.test_folder,
             ),
-            patch_size=model_info.input_size,
-            stride=int(model_info.input_size / 2),
-            use_pad=True,
+            tile_size=model_info.input_size,
+            scales=config.prediction.tiling.scales,
+            overlaps=config.prediction.tiling.overlaps,
         ),
         batch_size=1,  # config.training.batch_size, TODO: FIX
         num_workers=config.training.num_workers,
@@ -132,10 +151,8 @@ def pipeline(
         dataloader=submission_dataloader,
         model=model,
         batch_size=config.training.batch_size,
-        top_k_tile=config.training.top_k_tile,
         species_index_to_id=species_index_to_id,
         species_id_to_index=species_id_to_index,
-        min_score=config.training.min_score,
         accelerator=accelerator,
         transform_patch=timm.data.create_transform(**data_config, is_training=False),
     )

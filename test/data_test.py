@@ -2,6 +2,7 @@ import torch
 
 from src.data import (
     ConcatenatedDataset,
+    MultitileDataset,
     NonPlantDataset,
     PlantDataset,
     get_image_paths,
@@ -17,16 +18,17 @@ TRAIN_FILE_DIR = (
 
 def test_deterministic_order() -> None:
     # Test to see if multiple calls to get_samples return the same order
-    samples = get_plant_data_image_info(TRAIN_FILE_DIR)
-    samples2 = get_plant_data_image_info(TRAIN_FILE_DIR)
+    samples, rare_classes_1 = get_plant_data_image_info(TRAIN_FILE_DIR)
+    samples2, rare_classes_2 = get_plant_data_image_info(TRAIN_FILE_DIR)
     assert len(samples) == len(samples2)
+    assert len(rare_classes_1) == len(rare_classes_2) == 0
     for sample1, sample2 in zip(samples, samples2):
         assert sample1 == sample2
 
 
 def test_labeled_data_split_size() -> None:
     # Test to see if the data split sizes are correct and unique
-    plant_data_image_info = get_plant_data_image_info(TRAIN_FILE_DIR)
+    plant_data_image_info, _ = get_plant_data_image_info(TRAIN_FILE_DIR)
     total_samples = len(plant_data_image_info)
     train_indices, val_indices, test_indices = get_labeled_data_split(
         plant_data_image_info
@@ -53,7 +55,7 @@ def test_other_deterministic_order() -> None:
 def test_dataset_concatenation() -> None:
     # Test to see if the concatenated dataset returns the correct number of samples
     train_dataset = PlantDataset(
-        plant_data_image_info=get_plant_data_image_info(TRAIN_FILE_DIR),
+        plant_data_image_info=get_plant_data_image_info(TRAIN_FILE_DIR)[0],
         image_size=(400, 400),
         transform=None,
         indices=None,
@@ -84,7 +86,7 @@ def test_dataset_concatenation() -> None:
 
 def test_unlabeled_data_split_size() -> None:
     # Test to see if the data split sizes are correct and unique
-    total_samples = len(get_plant_data_image_info(TRAIN_FILE_DIR))
+    total_samples = len(get_plant_data_image_info(TRAIN_FILE_DIR)[0])
     train_indices, val_indices, test_indices = get_unlabeled_data_split(TRAIN_FILE_DIR)
     assert len(train_indices) + len(val_indices) + len(test_indices) == total_samples, (
         "Split sizes do not sum to total samples"
@@ -95,18 +97,82 @@ def test_unlabeled_data_split_size() -> None:
 
 def test_combine_species_threshold() -> None:
     # Test to see if combining species with low counts works correctly
-    plant_data_image_info = get_plant_data_image_info(
+    plant_data_image_info, rare_classes = get_plant_data_image_info(
         TRAIN_FILE_DIR, combine_classes_threshold=0
     )
     assert not any(info.species_id == 0 for info in plant_data_image_info)
+    assert len(rare_classes) == 0
     for threshold in [1, 10]:
-        plant_data_image_info = get_plant_data_image_info(
+        plant_data_image_info, rare_classes = get_plant_data_image_info(
             TRAIN_FILE_DIR, combine_classes_threshold=threshold
         )
         class_counts: dict[int, int] = {}
-        assert any(info.species_id == 0 for info in plant_data_image_info)
         for info in plant_data_image_info:
             class_counts[info.species_id] = class_counts.get(info.species_id, 0) + 1
-        assert all(count > threshold for count in class_counts.values()), (
-            "Some classes have less than 2 samples"
+        assert not any(info.species_id == 0 for info in plant_data_image_info)
+        assert all(class_counts[species] <= threshold for species in rare_classes)
+        all_species_ids = {info.species_id for info in plant_data_image_info}
+        non_rare_classes = {
+            species for species in all_species_ids if species not in rare_classes
+        }
+        assert not any(
+            class_counts[species] <= threshold for species in non_rare_classes
         )
+
+
+TEST_FILE_DIR = "/mnt/storage1/shared_data/plant_clef_2025/data/plant_clef_2025_test/"
+
+
+def test_multitile_dataset_scale() -> None:
+    for scale in [1, 2, 5, 9]:
+        dataset = MultitileDataset(
+            image_folder=TEST_FILE_DIR,
+            scales=[scale],
+        )
+        assert len(dataset) > 0, "Test dataset is empty"
+        patches, image_path = dataset[0]
+        assert patches.shape[-4] == scale**2
+
+
+def test_multitile_dataset_overlap() -> None:
+    dataset = MultitileDataset(
+        image_folder=TEST_FILE_DIR,
+        scales=[2],
+        overlaps=[0.5],
+    )
+    assert len(dataset) > 0, "Test dataset is empty"
+    patches, image_path = dataset[0]
+    assert patches.shape[-4] == 3**2
+
+
+def test_multitile_dataset_size() -> None:
+    dataset = MultitileDataset(
+        image_folder=TEST_FILE_DIR,
+        tile_size=100,
+    )
+    assert len(dataset) > 0, "Test dataset is empty"
+    patches, image_path = dataset[0]
+    assert patches.shape[-2:] == (100, 100)
+
+    dataset = MultitileDataset(
+        image_folder=TEST_FILE_DIR,
+        tile_size=518,
+        scales=[2],
+        overlaps=[0.5],
+    )
+    assert len(dataset) > 0, "Test dataset is empty"
+    patches, image_path = dataset[0]
+    assert patches.shape[-2:] == (518, 518)
+
+
+def test_multitile_dataset_multiscale() -> None:
+    dataset = MultitileDataset(
+        image_folder=TEST_FILE_DIR,
+        tile_size=100,
+        scales=[1, 2, 5],
+        overlaps=[0.0, 0.5, 0.0],
+    )
+    assert len(dataset) > 0, "Test dataset is empty"
+    patches, image_path = dataset[0]
+    assert patches.shape[-2:] == (100, 100)
+    assert patches.shape[-4] == 1 + 3**2 + 5**2

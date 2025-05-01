@@ -1,3 +1,4 @@
+import math
 import os
 import random
 from dataclasses import astuple, dataclass
@@ -44,13 +45,13 @@ class PatchDataset(Dataset):  # type: ignore[misc]
         return patch
 
 
-class TestDataset(Dataset):  # type: ignore[misc]
+class MultitileDataset(Dataset):  # type: ignore[misc]
     def __init__(
         self,
         image_folder: str,
-        patch_size: int = 518,
-        stride: int = 259,
-        use_pad: bool = False,
+        tile_size: int = 518,
+        scales: list[float] | None = None,
+        overlaps: list[float] | None = None,
     ) -> None:
         self.image_folder = image_folder
         self.image_paths = [
@@ -61,9 +62,13 @@ class TestDataset(Dataset):  # type: ignore[misc]
             for f in os.listdir(image_folder)
         ]
         self.transform = ttransforms.ToTensor()
-        self.use_pad = use_pad
-        self.patch_size = patch_size
-        self.stride = stride
+
+        self.scales = scales if scales is not None else [1.0]
+        self.overlaps = overlaps if overlaps is not None else [0.0]
+        assert len(self.scales) == len(self.overlaps), (
+            "Same number of scales and overlaps should be provided"
+        )
+        self.tile_size = tile_size
 
     def __len__(self) -> int:
         return len(self.image_paths)
@@ -77,33 +82,35 @@ class TestDataset(Dataset):  # type: ignore[misc]
             image = self.transform(image).unsqueeze(0)
 
         h, w = image.shape[-2:]
-
-        if self.use_pad:
+        patches_list = []
+        for scale, overlap in zip(self.scales, self.overlaps):
+            window_size = (math.ceil(h / scale), math.ceil(w / scale))
+            stride = (
+                math.ceil(window_size[0] * (1.0 - overlap)),
+                math.ceil(window_size[1] * (1.0 - overlap)),
+            )
             pad = compute_padding(
-                original_size=(
-                    h,
-                    w,
-                ),
-                window_size=self.patch_size,
-                stride=self.stride,
+                original_size=(h, w),
+                window_size=window_size,
+                stride=stride,
             )
             patches = extract_tensor_patches(
                 image,
-                self.patch_size,
-                self.stride,
+                window_size=window_size,
+                stride=stride,
                 padding=pad,
             )
-        else:
-            patches = extract_tensor_patches(
-                image,
-                self.patch_size,
-                self.stride,
+            patches = patches.squeeze(0)
+            patches = torch.nn.functional.interpolate(
+                patches,
+                size=(self.tile_size, self.tile_size),
+                mode="bilinear",
+                align_corners=False,
             )
+            patches_list.append(patches)
 
-        return (
-            patches,
-            image_path,
-        )
+        all_patches = torch.cat(patches_list, dim=0)
+        return (all_patches, image_path)
 
 
 @dataclass
@@ -112,22 +119,20 @@ class ImageSampleInfo:
     image_path: str
 
 
-def _combine_rare_classes(samples: list[ImageSampleInfo], threshold: int) -> None:
+def _get_rare_classes(samples: list[ImageSampleInfo], threshold: int) -> set[int]:
     if threshold <= 0:
-        return
+        return set()
 
     counts: dict[int, int] = {}
     for sample in samples:
         counts[sample.species_id] = counts.get(sample.species_id, 0) + 1
 
-    for sample in samples:
-        if counts.get(sample.species_id, 0) <= threshold:
-            sample.species_id = 0
+    return {sid for sid, count in counts.items() if count <= threshold}
 
 
 def get_plant_data_image_info(
     image_folder: str, combine_classes_threshold: int = 0
-) -> list[ImageSampleInfo]:
+) -> tuple[list[ImageSampleInfo], set[int]]:
     valid_extensions = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
     samples: list[ImageSampleInfo] = []  # List of (class_name, image_path) pairs.
     for cls in sorted(os.listdir(image_folder)):
@@ -142,9 +147,9 @@ def get_plant_data_image_info(
                         ImageSampleInfo(species_id=int(cls), image_path=path)
                     )
 
-    _combine_rare_classes(samples, combine_classes_threshold)
+    rare_classes = _get_rare_classes(samples, combine_classes_threshold)
 
-    return samples
+    return samples, rare_classes
 
 
 def get_image_paths(image_folder: str) -> list[str]:
