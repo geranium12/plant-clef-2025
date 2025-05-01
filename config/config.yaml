@@ -35,16 +35,16 @@ models:
   save:
     folder: "saved_models/5heads_all_labels_vit_base_patch14_reg4_dinov2.lvd142m"
     every: 1000
+  freeze_species_head: false # if true, just keep the original species head
 
 training:
+  enabled: true # if true, train the model
   use_all_data: false # if true, use all data for training
   val_size: 0.05
   test_size: 0.1
   batch_size: 144
   shuffle: True
   num_workers: 1
-  min_score: 0.1
-  top_k_tile: 2
   lr: 1e-4
   scheduler:
     factor: 0.1
@@ -62,9 +62,26 @@ evaluating:
   batch_size: 144
   shuffle: True
   num_workers: 8
+  test_enabled: true # if true, evaluate on the test set
 
 prediction:
   use_genus_and_family: true # if true, multiply probabilites of species, genus and family # Currently not compatible with data.combine_classes_threshold
+  tiling:
+    scales:
+      - 1.0
+      - 2.0
+      - 5.0
+    overlaps:
+      - 0.0
+      - 0.5
+      - 0.25
+  filter_genus: false # if true, predict only one species per genus
+  method: "top_k_tile" # One of ["top_k_tile", "BMA"]
+  top_k_tile:
+    k: 2
+    min_score: 0.1
+  BMA:
+    z_score_threshold: 2.0
 
 image_width: 518
 image_height: 518

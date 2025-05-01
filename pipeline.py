@@ -98,6 +98,7 @@ def pipeline(
         num_labels_family=num_labels_family,
         num_labels_plant=1,
         num_labels_species=len(species_index_to_id),
+        freeze_species_head=config.models.freeze_species_head,
     )
     print(model)
 
@@ -119,15 +120,15 @@ def pipeline(
     )
 
     submission_dataloader = DataLoader(
-        dataset=data.TestDataset(
+        dataset=data.MultitileDataset(
             image_folder=os.path.join(
                 config.project_path,
                 config.data.folder,
                 config.data.test_folder,
             ),
-            patch_size=model_info.input_size,
-            stride=int(model_info.input_size / 2),
-            use_pad=True,
+            tile_size=model_info.input_size,
+            scales=config.prediction.tiling.scales,
+            overlaps=config.prediction.tiling.overlaps,
         ),
         batch_size=1,  # config.training.batch_size, TODO: FIX
         num_workers=config.training.num_workers,
@@ -141,10 +142,8 @@ def pipeline(
         model=model,
         model_info=model_info,
         batch_size=config.training.batch_size,
-        top_k_tile=config.training.top_k_tile,
         species_index_to_id=species_index_to_id,
         species_id_to_index=species_id_to_index,
-        min_score=config.training.min_score,
         accelerator=accelerator,
     )
 

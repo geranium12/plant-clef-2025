@@ -220,40 +220,45 @@ def train(
         evaluator=evaluator if data_manager.val_dataloader else None,
     )
 
-    # Run training
-    accelerator.print("Starting training...")
-    trained_model = trainer.train()
-    accelerator.print("Training finished.")
+    unwrapped_model = None
+    if config.training.enabled:
+        # Run training
+        accelerator.print("Starting training...")
+        trained_model = trainer.train()
+        accelerator.print("Training finished.")
 
-    accelerator.print("Saving the trained model...")
-    accelerator.wait_for_everyone()
-    unwrapped_model = accelerator.unwrap_model(trained_model)
-    save_path = os.path.join(
-        config.project_path,
-        config.models.folder,
-        config.models.save.folder,
-        "final_model",
-    )
-    accelerator.save_model(
-        unwrapped_model,
-        save_path,
-    )
-    accelerator.print(f"Model saved to {save_path}")
+        accelerator.print("Saving the trained model...")
+        accelerator.wait_for_everyone()
+        unwrapped_model = accelerator.unwrap_model(trained_model)
+        save_path = os.path.join(
+            config.project_path,
+            config.models.folder,
+            config.models.save.folder,
+            "final_model",
+        )
+        accelerator.save_model(
+            unwrapped_model,
+            save_path,
+        )
+        accelerator.print(f"Model saved to {save_path}")
 
-    # Run final evaluation on the test set
-    accelerator.print("Starting testing...")
-    test_results = evaluator.evaluate_on_dataloader(
-        model=model,
-        config=config,
-        data_manager=data_manager,
-        dataloader=data_manager.test_dataloader,
-        prefix="test",
-        call_time=0,
-    )
-    accelerator.print("Testing finished.")
-    accelerator.print("Final Test Results:")
-    for key, value in test_results.items():
-        accelerator.print(f"- {key}: {value:.4f}")
+    unwrapped_model = unwrapped_model if unwrapped_model else model
+
+    if config.evaluating.test_enabled:
+        # Run final evaluation on the test set
+        accelerator.print("Starting testing...")
+        test_results = evaluator.evaluate_on_dataloader(
+            model=model,
+            config=config,
+            data_manager=data_manager,
+            dataloader=data_manager.test_dataloader,
+            prefix="test",
+            call_time=0,
+        )
+        accelerator.print("Testing finished.")
+        accelerator.print("Final Test Results:")
+        for key, value in test_results.items():
+            accelerator.print(f"- {key}: {value:.4f}")
 
     data_config = timm.data.resolve_model_data_config(unwrapped_model)
     model_info = ModelInfo(

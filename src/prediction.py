@@ -43,16 +43,83 @@ class AverageMeter:
         self.avg = self.sum / self.count
 
 
+def top_k_tile_prediction(
+    tiles_probabilities: torch.Tensor,
+    species_index_to_id: dict[int, int],
+    top_k_tile: int,
+    min_score: float,
+) -> dict[int, float]:
+    image_results: dict[int, float] = {}
+
+    # Get the top-k indices and probabilities
+    (
+        top_probs,
+        top_indices,
+    ) = torch.topk(
+        tiles_probabilities,
+        top_k_tile,
+    )
+    top_probs = top_probs.cpu().numpy()
+    top_indices = top_indices.cpu().numpy()
+
+    for (
+        top_tile_indices,
+        top_tile_probs,
+    ) in zip(top_indices, top_probs):
+        for (
+            top_idx,
+            top_prob,
+        ) in zip(top_tile_indices, top_tile_probs):
+            species_id = species_index_to_id[top_idx]
+            # Update the results dictionary only if the probability is higher
+            if top_prob > min_score:
+                if top_idx not in image_results or image_results[species_id] < top_prob:
+                    image_results[species_id] = top_prob
+
+    return image_results
+
+
+def bma_prediction(
+    tiles_probabilities: torch.Tensor,
+    species_index_to_id: dict[int, int],
+    z_score_threshold: float,
+) -> dict[int, float]:
+    # From "Patch-wise Inference using Pre-trained Vision Transformers: NEUON Submission to PlantCLEF 2024" Figure 8
+    d = tiles_probabilities.shape[1]
+
+    ss = (
+        1
+        / (d - 1)
+        * torch.sum(
+            (tiles_probabilities - tiles_probabilities.mean(dim=1, keepdim=True)) ** 2,
+            dim=1,
+        )
+    )
+    var = torch.abs(torch.log10(ss))
+    confidence = torch.sqrt((torch.max(var) + 0.5 - var) / (torch.max(var) + 0.5))
+    p_i_d = confidence / torch.sum(confidence, dim=0, keepdim=True)
+    weighted_probabilities = tiles_probabilities * p_i_d.unsqueeze(1)
+    image_probabilities = torch.sum(weighted_probabilities, dim=0)
+
+    z_scores = (
+        image_probabilities - torch.mean(image_probabilities, dim=0)
+    ) / torch.std(image_probabilities, dim=0)
+
+    return {
+        species_index_to_id[idx]: prob
+        for idx, prob in enumerate(image_probabilities)
+        if z_scores[idx] > z_score_threshold
+    }
+
+
 def predict(
     config: DictConfig,
     dataloader: DataLoader,
     model: torch.nn.Module,
     model_info: ModelInfo,
     batch_size: int,
-    top_k_tile: int,
     species_index_to_id: dict[int, int],
     species_id_to_index: dict[int, int],
-    min_score: float,
     accelerator: Accelerator,
 ) -> dict[str, list[int]]:
     image_predictions: dict[str, list[int]] = {}
@@ -118,7 +185,6 @@ def predict(
             patches,
             image_path,
         ) in enumerate(dataloader):
-            image_results: dict[int, float] = {}
             quadrat_id = os.path.splitext(os.path.basename(image_path[0]))[0]
             transform_patch = ttransforms.Normalize(
                 mean=model_info.mean,
@@ -133,6 +199,8 @@ def predict(
                 batch_size=batch_size,
                 shuffle=False,
             )
+
+            image_tile_probabilities: torch.Tensor = None
 
             for batch_patches in patch_loader:
                 with autocast("cuda"):
@@ -177,33 +245,47 @@ def predict(
                     else:
                         probabilities = probabilities_species
 
-                    # Get the top-k indices and probabilities
-                    (
-                        top_probs,
-                        top_indices,
-                    ) = torch.topk(
-                        probabilities,
-                        top_k_tile,
+                    image_tile_probabilities = (
+                        probabilities
+                        if image_tile_probabilities is None
+                        else torch.cat((image_tile_probabilities, probabilities), dim=0)
                     )
-                    top_probs = top_probs.cpu().numpy()
-                    top_indices = top_indices.cpu().numpy()
 
-                    for (
-                        top_tile_indices,
-                        top_tile_probs,
-                    ) in zip(top_indices, top_probs):
-                        for (
-                            top_idx,
-                            top_prob,
-                        ) in zip(top_tile_indices, top_tile_probs):
-                            species_id = species_index_to_id[top_idx]
-                            # Update the results dictionary only if the probability is higher
-                            if top_prob > min_score:
-                                if (
-                                    top_idx not in image_results
-                                    or image_results[top_idx] < top_prob
-                                ):
-                                    image_results[species_id] = top_prob
+            image_results: dict[int, float] = {}
+            match config.prediction.method:
+                case "top_k_tile":
+                    image_results = top_k_tile_prediction(
+                        image_tile_probabilities,
+                        species_index_to_id,
+                        top_k_tile=config.prediction.top_k_tile.k,
+                        min_score=config.prediction.top_k_tile.min_score,
+                    )
+                case "BMA":
+                    image_results = bma_prediction(
+                        image_tile_probabilities,
+                        species_index_to_id,
+                        z_score_threshold=config.prediction.BMA.z_score_threshold,
+                    )
+                case _:
+                    raise ValueError(
+                        f"Unknown prediction method: {config.prediction.method}"
+                    )
+
+            if config.prediction.filter_genus:
+                # Predict only the top species per genus
+                filtered_results: dict[int, tuple[int, float]] = {}
+                for species_id, prob in image_results.items():
+                    species_idx = species_id_to_index[species_id]
+                    genus_id = species_to_genus[species_idx].item()
+                    if (
+                        genus_id not in filtered_results
+                        or prob > filtered_results[genus_id][1]
+                    ):
+                        filtered_results[genus_id] = (species_id, prob)
+                image_results = {
+                    species_id: prob for species_id, prob in filtered_results.values()
+                }
+
             # store the prediction
             image_predictions[quadrat_id] = list(image_results.keys())
 

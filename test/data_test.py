@@ -2,6 +2,7 @@ import torch
 
 from src.data import (
     ConcatenatedDataset,
+    MultitileDataset,
     NonPlantDataset,
     PlantDataset,
     get_image_paths,
@@ -117,3 +118,61 @@ def test_combine_species_threshold() -> None:
         assert not any(
             class_counts[species] <= threshold for species in non_rare_classes
         )
+
+
+TEST_FILE_DIR = "/mnt/storage1/shared_data/plant_clef_2025/data/plant_clef_2025_test/"
+
+
+def test_multitile_dataset_scale() -> None:
+    for scale in [1, 2, 5, 9]:
+        dataset = MultitileDataset(
+            image_folder=TEST_FILE_DIR,
+            scales=[scale],
+        )
+        assert len(dataset) > 0, "Test dataset is empty"
+        patches, image_path = dataset[0]
+        assert patches.shape[-4] == scale**2
+
+
+def test_multitile_dataset_overlap() -> None:
+    dataset = MultitileDataset(
+        image_folder=TEST_FILE_DIR,
+        scales=[2],
+        overlaps=[0.5],
+    )
+    assert len(dataset) > 0, "Test dataset is empty"
+    patches, image_path = dataset[0]
+    assert patches.shape[-4] == 3**2
+
+
+def test_multitile_dataset_size() -> None:
+    dataset = MultitileDataset(
+        image_folder=TEST_FILE_DIR,
+        tile_size=100,
+    )
+    assert len(dataset) > 0, "Test dataset is empty"
+    patches, image_path = dataset[0]
+    assert patches.shape[-2:] == (100, 100)
+
+    dataset = MultitileDataset(
+        image_folder=TEST_FILE_DIR,
+        tile_size=518,
+        scales=[2],
+        overlaps=[0.5],
+    )
+    assert len(dataset) > 0, "Test dataset is empty"
+    patches, image_path = dataset[0]
+    assert patches.shape[-2:] == (518, 518)
+
+
+def test_multitile_dataset_multiscale() -> None:
+    dataset = MultitileDataset(
+        image_folder=TEST_FILE_DIR,
+        tile_size=100,
+        scales=[1, 2, 5],
+        overlaps=[0.0, 0.5, 0.0],
+    )
+    assert len(dataset) > 0, "Test dataset is empty"
+    patches, image_path = dataset[0]
+    assert patches.shape[-2:] == (100, 100)
+    assert patches.shape[-4] == 1 + 3**2 + 5**2
