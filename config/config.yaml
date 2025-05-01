@@ -30,16 +30,18 @@ data:
 models:
   name: "vit_base_patch14_reg4_dinov2.lvd142m"
   pretrained: false
-  folder: "models/"
-  checkpoint_file: "model_onlyclassifier_then_all/model_best.pth.tar"
+  # folder: "models/"
+  # checkpoint_file: "model_onlyclassifier_then_all/model_best.pth.tar"
+  folder: "unsharded_moved_models/"
+  checkpoint_file: "unsharded_model-only-classifier-then-all-bs32-ep81-lr8e-5-lucas_model_0101249.pth"
   save:
-    folder: "saved_models/5heads_all_labels_vit_base_patch14_reg4_dinov2.lvd142m"
+    folder: "saved_models/5heads_vit_base_patch14_reg4_dinov2.lvd142m-lucas_model_0101249"
     every: 1000
 
 training:
   use_all_data: false # if true, use all data for training
   val_size: 0.05
-  test_size: 0.1
+  test_size: 0.05
   batch_size: 144
   shuffle: True
   num_workers: 1
@@ -64,11 +66,11 @@ evaluating:
   num_workers: 8
 
 prediction:
-  use_genus_and_family: true
+  use_genus_and_family: false
 
 image_width: 518
 image_height: 518
 
-submission_file: "submission.csv"
+submission_file: "submission_5heads_vit_base_patch14_reg4_dinov2.lvd142m-lucas_model_0101249_no_gf_pred.csv"
 
 seed: 42
