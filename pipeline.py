@@ -97,7 +97,7 @@ def pipeline(
         num_labels_genus=num_labels_genus,
         num_labels_family=num_labels_family,
         num_labels_plant=1,
-        num_labels_species=len(set(species_id_to_index.values())),
+        num_labels_species=len(species_index_to_id),
     )
     print(model)
 
