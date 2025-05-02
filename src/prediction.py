@@ -22,6 +22,7 @@ from utils.build_hierarchies import (
     read_plant_taxonomy,
 )
 
+from typing import Optional
 
 class AverageMeter:
     def __init__(
@@ -120,7 +121,7 @@ def predict(
     batch_size: int,
     species_index_to_id: dict[int, int],
     species_id_to_index: dict[int, int],
-    accelerator: Accelerator,
+    accelerator: Accelerator
 ) -> dict[str, list[int]]:
     image_predictions: dict[str, list[int]] = {}
 
@@ -210,23 +211,25 @@ def predict(
                         dim=1,
                     )
 
-                    probabilities_genus = torch.nn.functional.softmax(
-                        outputs["logits_genus"], dim=1
-                    )
-
-                    probabilities_family = torch.nn.functional.softmax(
-                        outputs["logits_family"], dim=1
-                    )
-
-                    species_to_genus = species_to_genus.to(probabilities_species.device)
-                    species_to_family = species_to_family.to(
-                        probabilities_species.device
-                    )
-
                     if (
                         config.prediction.use_genus_and_family
-                        and config.data.combine_classes_threshold == 0
                     ):  # TODO: Make multiplication of probabilities compatible with combine_classes_threshold
+
+                        probabilities_genus = torch.nn.functional.softmax(
+                            outputs["logits_genus"], dim=1
+                        )
+
+                        probabilities_family = torch.nn.functional.softmax(
+                            outputs["logits_family"], dim=1
+                        )
+
+                        species_to_genus = species_to_genus.to(
+                            probabilities_species.device
+                        )
+                        species_to_family = species_to_family.to(
+                            probabilities_species.device
+                        )
+
                         genus_probs = probabilities_genus.gather(
                             1,
                             species_to_genus.unsqueeze(0).expand(
@@ -239,9 +242,8 @@ def predict(
                                 probabilities_species.shape[0], -1
                             ),
                         )
-                        probabilities = (
-                            probabilities_species * genus_probs * family_probs
-                        )
+                        probabilities = probabilities_species
+                        probabilities[:,1:] *= genus_probs * family_probs
                     else:
                         probabilities = probabilities_species
 
