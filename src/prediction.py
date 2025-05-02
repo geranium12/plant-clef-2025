@@ -211,7 +211,7 @@ def predict(
                         dim=1,
                     )
 
-                    if config.prediction.use_genus_and_family:  # TODO: Make multiplication of probabilities compatible with combine_classes_threshold
+                    if config.prediction.use_genus_and_family:
                         probabilities_genus = torch.nn.functional.softmax(
                             outputs["logits_genus"], dim=1
                         )
@@ -239,8 +239,12 @@ def predict(
                                 probabilities_species.shape[0], -1
                             ),
                         )
-                        probabilities = probabilities_species
-                        probabilities[:, 1:] *= genus_probs * family_probs
+                        probabilities = probabilities_species.clone()
+                        if config.data.combine_classes_threshold == 0:
+                            probabilities *= genus_probs * family_probs
+                        else:
+                            probabilities[:, 1:] *= genus_probs * family_probs
+
                     else:
                         probabilities = probabilities_species
 
