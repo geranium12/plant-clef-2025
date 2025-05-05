@@ -29,6 +29,7 @@ data:
 
 models:
   name: "vit_base_patch14_reg4_dinov2.lvd142m"
+  load_5heads_model: True # if true, load the 5 heads model
   pretrained: false
   # folder: "models/"
   # checkpoint_file: "model_onlyclassifier_then_all/model_best.pth.tar"

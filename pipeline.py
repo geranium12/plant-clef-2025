@@ -1,6 +1,7 @@
 import os
 
 import hydra
+import safetensors.torch
 import timm
 from accelerate import Accelerator
 from omegaconf import (
@@ -10,9 +11,10 @@ from omegaconf import (
 from torch.utils.data import DataLoader
 
 import src.data as data
+import src.utils
 from src import augmentation, prediction, submission, training
 from src.data_manager import DataManager
-from src.utils import ModelInfo, define_metrics, load_model
+from src.utils import ModelInfo, define_metrics
 from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 from utils.build_hierarchies import (
     get_organ_number,
@@ -88,19 +90,42 @@ def pipeline(
         }
         species_index_to_id = {idx: sid for sid, idx in species_id_to_index.items()}
 
-    model = load_model(
-        config=config,
-        num_classes=len(df_metadata["species_id"].unique()),
-    )
-    model = ViTMultiHeadClassifier(
-        backbone=model,
-        num_labels_organ=get_organ_number(df_metadata),
-        num_labels_genus=num_labels_genus,
-        num_labels_family=num_labels_family,
-        num_labels_plant=1,
-        num_labels_species=len(species_index_to_id),
-        freeze_species_head=config.models.freeze_species_head,
-    )
+    if config.models.load_5heads_model:
+        model_path = os.path.join(
+            config.project_path,
+            config.models.folder,
+            config.models.checkpoint_file,
+            "model.safetensors",
+        )
+        backbone = timm.create_model(
+            config.models.name,
+            pretrained=False,
+            num_classes=len(species_index_to_id),
+        )
+        model = ViTMultiHeadClassifier(
+            backbone=backbone,
+            num_labels_organ=get_organ_number(df_metadata),
+            num_labels_genus=num_labels_genus,
+            num_labels_family=num_labels_family,
+            num_labels_plant=1,
+            num_labels_species=len(species_index_to_id),
+            freeze_species_head=config.models.freeze_species_head,
+        )
+        safetensors.torch.load_model(model, model_path)
+    else:
+        model = src.utils.load_model(
+            config=config,
+            num_classes=len(df_metadata["species_id"].unique()),
+        )
+        model = ViTMultiHeadClassifier(
+            backbone=model,
+            num_labels_organ=get_organ_number(df_metadata),
+            num_labels_genus=num_labels_genus,
+            num_labels_family=num_labels_family,
+            num_labels_plant=1,
+            num_labels_species=len(species_index_to_id),
+            freeze_species_head=config.models.freeze_species_head,
+        )
     accelerator.print(model)
 
     data_config = timm.data.resolve_model_data_config(model)
@@ -110,6 +135,7 @@ def pipeline(
         std=data_config["std"],
     )
     accelerator.print(f"Model info: {model_info}")
+    accelerator.print(f"{timm.data.create_transform(**data_config, is_training=False)}")
 
     # Initialize data management
     data_manager = DataManager(
