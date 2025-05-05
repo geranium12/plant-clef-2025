@@ -82,6 +82,7 @@ prediction:
     min_score: 0.1
   BMA:
     z_score_threshold: 2.0
+  filter_species_threshold: 100 # The predictions for images with less than this number of images will be filtered out
 
 image_width: 518
 image_height: 518
