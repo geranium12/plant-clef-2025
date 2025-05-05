@@ -44,4 +44,3 @@
 - [x] Implement "top genus" filter for inference
 - [x] Implement Bayesian Model Averaging or find a similar voting/pooling technique for inference
 - [x] Use trees for eval on multiplication of possible options
-

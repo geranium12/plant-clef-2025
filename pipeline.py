@@ -148,6 +148,7 @@ def pipeline(
     )
 
     if config.prediction.filter_species_threshold > 0:
+        # We recompute rare species, since the filter_species_threshold may differ from the threshold used for training
         rare_species = data._get_rare_classes(
             plant_data_image_info, config.prediction.filter_species_threshold
         )
