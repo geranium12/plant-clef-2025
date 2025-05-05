@@ -184,6 +184,16 @@ def pipeline(
         transform_patch=timm.data.create_transform(**data_config, is_training=False),
     )
 
+    if config.prediction.filter_species_threshold > 0:
+        # We recompute rare species, since the filter_species_threshold may differ from the threshold used for training
+        rare_species = data._get_rare_classes(
+            plant_data_image_info, config.prediction.filter_species_threshold
+        )
+        image_predictions = {
+            k: [i for i in v if i not in rare_species]
+            for k, v in image_predictions.items()
+        }
+
     submission.submit(
         config,
         image_predictions,

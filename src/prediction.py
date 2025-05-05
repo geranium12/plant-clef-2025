@@ -208,23 +208,22 @@ def predict(
                         dim=1,
                     )
 
-                    probabilities_genus = torch.nn.functional.softmax(
-                        outputs["logits_genus"], dim=1
-                    )
+                    if config.prediction.use_genus_and_family:
+                        probabilities_genus = torch.nn.functional.softmax(
+                            outputs["logits_genus"], dim=1
+                        )
 
-                    probabilities_family = torch.nn.functional.softmax(
-                        outputs["logits_family"], dim=1
-                    )
+                        probabilities_family = torch.nn.functional.softmax(
+                            outputs["logits_family"], dim=1
+                        )
 
-                    species_to_genus = species_to_genus.to(probabilities_species.device)
-                    species_to_family = species_to_family.to(
-                        probabilities_species.device
-                    )
+                        species_to_genus = species_to_genus.to(
+                            probabilities_species.device
+                        )
+                        species_to_family = species_to_family.to(
+                            probabilities_species.device
+                        )
 
-                    if (
-                        config.prediction.use_genus_and_family
-                        and config.data.combine_classes_threshold == 0
-                    ):  # TODO: Make multiplication of probabilities compatible with combine_classes_threshold
                         genus_probs = probabilities_genus.gather(
                             1,
                             species_to_genus.unsqueeze(0).expand(
@@ -237,9 +236,12 @@ def predict(
                                 probabilities_species.shape[0], -1
                             ),
                         )
-                        probabilities = (
-                            probabilities_species * genus_probs * family_probs
-                        )
+                        probabilities = probabilities_species.clone()
+                        if config.data.combine_classes_threshold == 0:
+                            probabilities *= genus_probs * family_probs
+                        else:
+                            probabilities[:, 1:] *= genus_probs * family_probs
+
                         # print top 10 probabilities
                         # top_probs, top_indices = torch.topk(probabilities, 5, dim=1)
                         # torch.set_printoptions(threshold=8)
