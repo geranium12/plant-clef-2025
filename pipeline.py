@@ -147,6 +147,15 @@ def pipeline(
         accelerator=accelerator,
     )
 
+    if config.prediction.filter_species_threshold > 0:
+        rare_species = data._get_rare_classes(
+            plant_data_image_info, config.prediction.filter_species_threshold
+        )
+        image_predictions = {
+            k: [i for i in v if i not in rare_species]
+            for k, v in image_predictions.items()
+        }
+
     submission.submit(
         config,
         image_predictions,
