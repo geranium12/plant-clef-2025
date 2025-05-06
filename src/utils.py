@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 
 import pandas as pd
+import safetensors
 import timm
 import torch
 import torch.nn as nn
@@ -9,6 +10,7 @@ from accelerate import Accelerator
 from omegaconf import DictConfig
 
 import wandb
+from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 
 
 @dataclass
@@ -18,7 +20,7 @@ class ModelInfo:
     std: float
 
 
-def load_model(config: DictConfig, num_classes: int) -> nn.Module:
+def load_timm_model(config: DictConfig, num_classes: int) -> nn.Module:
     model = timm.create_model(
         config.models.name,
         pretrained=config.models.pretrained,
@@ -28,6 +30,58 @@ def load_model(config: DictConfig, num_classes: int) -> nn.Module:
         ),
     )
     model = model.eval()
+    return model
+
+
+def load_model(
+    config: DictConfig,
+    df_metadata: pd.DataFrame,
+    num_species: int,
+    num_genus: int,
+    num_family: int,
+    num_organ: int,
+    num_plant: int,
+) -> nn.Module:
+    if config.models.load_5heads_model:
+        model_path = os.path.join(
+            config.project_path,
+            config.models.folder,
+            config.models.checkpoint_file,
+            "model.safetensors",
+        )
+        backbone = timm.create_model(
+            config.models.name,
+            pretrained=False,
+            num_classes=num_species,
+        )
+        model = ViTMultiHeadClassifier(
+            backbone=backbone,
+            num_labels_species=num_species,
+            num_labels_organ=num_organ,
+            num_labels_genus=num_genus,
+            num_labels_family=num_family,
+            num_labels_plant=num_plant,
+            freeze_backbone=config.models.freeze_backbone,
+            freeze_species_head=config.models.freeze_species_head,
+            classifier_type=config.models.classifier_type,
+        )
+        safetensors.torch.load_model(model, model_path)
+    else:
+        model = load_timm_model(
+            config=config,
+            num_classes=len(df_metadata["species_id"].unique()),
+        )
+        model = ViTMultiHeadClassifier(
+            backbone=model,
+            num_labels_species=num_species,
+            num_labels_organ=num_organ,
+            num_labels_genus=num_genus,
+            num_labels_family=num_family,
+            num_labels_plant=num_plant,
+            freeze_backbone=config.models.freeze_backbone,
+            freeze_species_head=config.models.freeze_species_head,
+            classifier_type=config.models.classifier_type,
+        )
     return model
 
 
