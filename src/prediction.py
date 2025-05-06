@@ -49,6 +49,7 @@ def top_k_tile_prediction(
     species_index_to_id: dict[int, int],
     top_k_tile: int,
     min_score: float,
+    top_n: int,
 ) -> dict[int, float]:
     image_results: dict[int, float] = {}
 
@@ -76,6 +77,11 @@ def top_k_tile_prediction(
             if top_prob > min_score:
                 if top_idx not in image_results or image_results[species_id] < top_prob:
                     image_results[species_id] = top_prob
+
+    if top_n > 0:
+        image_results = dict(
+            sorted(image_results.items(), key=lambda x: x[1], reverse=True)[:top_n]
+        )
 
     return image_results
 
@@ -273,6 +279,7 @@ def predict(
                         species_index_to_id,
                         top_k_tile=config.prediction.top_k_tile.k,
                         min_score=config.prediction.top_k_tile.min_score,
+                        top_n=config.prediction.top_k_tile.top_n,
                     )
                 case "BMA":
                     image_results = bma_prediction(
