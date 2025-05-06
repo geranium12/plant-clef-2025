@@ -38,6 +38,7 @@ models:
   save:
     folder: "saved_models/5heads_vit_base_patch14_reg4_dinov2.lvd142m-lucas_model_0101249"
     every: 1000
+  freeze_backbone: true # if true, freeze the backbone
   freeze_species_head: false # if true, just keep the original species head
 
 training:

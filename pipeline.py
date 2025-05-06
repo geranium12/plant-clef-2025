@@ -109,6 +109,7 @@ def pipeline(
             num_labels_family=num_labels_family,
             num_labels_plant=1,
             num_labels_species=len(species_index_to_id),
+            freeze_backbone=config.models.freeze_backbone,
             freeze_species_head=config.models.freeze_species_head,
         )
         safetensors.torch.load_model(model, model_path)
@@ -124,6 +125,7 @@ def pipeline(
             num_labels_family=num_labels_family,
             num_labels_plant=1,
             num_labels_species=len(species_index_to_id),
+            freeze_backbone=config.models.freeze_backbone,
             freeze_species_head=config.models.freeze_species_head,
         )
     accelerator.print(model)
