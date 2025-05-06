@@ -1,0 +1,102 @@
+defaults:
+  - _self_
+
+project_name: "PlantClef2025"
+
+project_path: "/mnt/storage1/shared_data/plant_clef_2025/"
+
+data:
+  folder: "data/"
+  metadata:
+    folder: "metadata/"
+    training: "PlantCLEF2024_single_plant_training_metadata.csv"
+    test: "PlantCLEF2025_test.csv"
+    no_label: "pseudoquadrats_without_labels_complementary_training_set_urls.csv"
+  train_folder: "plant_clef_train_281gb/"
+  test_folder: "plant_clef_2025_test/"
+  test_images_folder: "PlantCLEF2025_test_images/PlantCLEF2025_test_images/"
+  utils:
+    folder: "utils/"
+    plant_taxonomy_file: "plant_taxonomy.pkl"
+    organ_hierarchy_file: "organ_hierarchy.csv"
+    genus_mapping: "genus_ids.csv"
+    family_mapping: "family_ids.csv"
+    organ_mapping: "organ_ids.csv"
+    species_mapping: "species_names.csv"
+  other:
+    folder: "other/"
+  combine_classes_threshold: 0 # The minimum number of images required for a class the get its own label # Currently not compatible with prediction.use_genus_and_family
+
+models:
+  name: "vit_base_patch14_reg4_dinov2.lvd142m"
+  pretrained: False
+  folder: "models/"
+  checkpoint_file: "model_onlyclassifier_then_all/model_best.pth.tar"
+  # folder: "unsharded_moved_models/"
+  # checkpoint_file: "unsharded_model-only-classifier-then-all-bs32-ep122-lr8e-5-lucas_model_0153749.pth"
+  save:
+    # folder: "saved_models/5heads_vit_base_patch14_reg4_dinov2.lvd142m-lucas_model_0153749_2layers/"
+    # folder: "saved_models/5heads_vit_base_patch14_reg4_dinov2.lvd142m-classifier-then-all-2layers"
+    folder: "save_models/saved_model.pth"
+    every: 1000
+  freeze_species_head: False # if true, just keep the original species head
+
+training:
+  enabled: False # if true, train the model
+  use_all_data: False # if true, use all data for training
+  val_size: 0.05
+  test_size: 0.05
+  batch_size: 144
+  shuffle: True
+  num_workers: 1
+  lr: 1e-4
+  scheduler:
+    factor: 0.1
+    patience: 10
+  epochs: 1
+  loss_weights:
+    species: 1.0
+    genus: 1.0
+    family: 1.0
+    plant: 1.0
+    organ: 1.0
+
+evaluating:
+  every: 1000
+  batch_size: 144
+  shuffle: True
+  num_workers: 8
+  test_enabled: False # if true, evaluate on the test set
+
+prediction:
+  use_genus_and_family: False # if true, multiply probabilites of species, genus and family # Currently not compatible with data.combine_classes_threshold
+  tiling:
+    scales:
+      - 1.0
+      # - 2.0
+      # - 3.0
+      # - 5.0
+      # - 8.0
+    overlaps:
+      - 0.0
+      # - 0.0
+      # - 0.0
+      # - 0.25
+      # - 0.5
+  filter_genus: False # if true, predict only one species per genus
+  method: "top_k_tile" # One of ["top_k_tile", "BMA"]
+  top_k_tile:
+    k: 5
+    min_score: 0.1
+  BMA:
+    z_score_threshold: 2.0
+  filter_species_threshold: 0 # The predictions for images with less than this number of images will be filtered out
+
+image_width: 518
+image_height: 518
+
+# submission_file: "submission_5heads_vit_base_patch14_reg4_dinov2.lvd142m-lucas_model_0101249_no_gf_pred.csv"
+# submission_file: "submission_tile_5_overlaps_0_topk_1_5heads_lucas_153799_2layers.csv"
+submission_file: "submission_1.csv"
+
+seed: 42
