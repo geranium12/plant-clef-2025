@@ -111,6 +111,7 @@ def pipeline(
             num_labels_species=len(species_index_to_id),
             freeze_backbone=config.models.freeze_backbone,
             freeze_species_head=config.models.freeze_species_head,
+            classifier_type=config.models.classifier_type,
         )
         safetensors.torch.load_model(model, model_path)
     else:
@@ -127,6 +128,7 @@ def pipeline(
             num_labels_species=len(species_index_to_id),
             freeze_backbone=config.models.freeze_backbone,
             freeze_species_head=config.models.freeze_species_head,
+            classifier_type=config.models.classifier_type,
         )
     accelerator.print(model)
 

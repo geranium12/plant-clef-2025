@@ -40,6 +40,7 @@ models:
     every: 1000
   freeze_backbone: true # if true, freeze the backbone
   freeze_species_head: false # if true, just keep the original species head
+  classifier_type: "one_layer" # ["one_layer", "two_layer_act"]
 
 training:
   enabled: true # if true, train the model
