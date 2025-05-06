@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 import src.data as data
 from src import augmentation, prediction, submission, training
 from src.data_manager import DataManager
+from src.merged_model import MergedModel
 from src.utils import ModelInfo, define_metrics, load_model
 from utils.build_hierarchies import (
     get_organ_number,
@@ -87,19 +88,60 @@ def pipeline(
         }
         species_index_to_id = {idx: sid for sid, idx in species_id_to_index.items()}
 
-    model = load_model(
-        config=config,
-        df_metadata=df_metadata,
-        num_species=len(species_index_to_id),
-        num_genus=num_labels_genus,
-        num_family=num_labels_family,
-        num_organ=get_organ_number(df_metadata),
-        num_plant=1,
-    )
+    if config.merge.enabled:
+        species_model = load_model(
+            model_config=config.merge.species_model,
+            df_metadata=df_metadata,
+            num_species=len(species_id_to_index),
+            num_genus=num_labels_genus,
+            num_family=num_labels_family,
+            num_organ=get_organ_number(df_metadata),
+            num_plant=1,
+            project_path=config.project_path,
+        )
+        genus_model = load_model(
+            model_config=config.merge.genus_model,
+            df_metadata=df_metadata,
+            num_species=len(species_id_to_index),
+            num_genus=num_labels_genus,
+            num_family=num_labels_family,
+            num_organ=get_organ_number(df_metadata),
+            num_plant=1,
+            project_path=config.project_path,
+        )
+        family_model = load_model(
+            model_config=config.merge.family_model,
+            df_metadata=df_metadata,
+            num_species=len(species_id_to_index),
+            num_genus=num_labels_genus,
+            num_family=num_labels_family,
+            num_organ=get_organ_number(df_metadata),
+            num_plant=1,
+            project_path=config.project_path,
+        )
+        model = MergedModel(
+            species_model=species_model,
+            genus_model=genus_model,
+            family_model=family_model,
+        )
+    else:
+        model = load_model(
+            model_config=config.models,
+            df_metadata=df_metadata,
+            num_species=len(species_index_to_id),
+            num_genus=num_labels_genus,
+            num_family=num_labels_family,
+            num_organ=get_organ_number(df_metadata),
+            num_plant=1,
+            project_path=config.project_path,
+        )
 
     accelerator.print(model)
 
-    data_config = timm.data.resolve_model_data_config(model)
+    if config.merge.enabled:
+        data_config = timm.data.resolve_model_data_config(model.species_model)
+    else:
+        data_config = timm.data.resolve_model_data_config(model)
     model_info = ModelInfo(
         input_size=data_config["input_size"][1],  # Assuming (C, H, W)
         mean=data_config["mean"],
@@ -120,12 +162,14 @@ def pipeline(
         random_transform=augmentation.get_random_data_augmentation(),
     )
 
-    model = training.train(
-        model=model,
-        data_manager=data_manager,
-        config=config,
-        accelerator=accelerator,
-    )
+    if not config.merge.enabled:
+        model = training.train(
+            model=model,
+            data_manager=data_manager,
+            config=config,
+            accelerator=accelerator,
+        )
+    model = accelerator.prepare(model)
 
     submission_dataloader = DataLoader(
         dataset=data.MultitileDataset(

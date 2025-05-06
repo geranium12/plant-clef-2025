@@ -20,37 +20,25 @@ class ModelInfo:
     std: float
 
 
-def load_timm_model(config: DictConfig, num_classes: int) -> nn.Module:
-    model = timm.create_model(
-        config.models.name,
-        pretrained=config.models.pretrained,
-        num_classes=num_classes,
-        checkpoint_path=os.path.join(
-            config.project_path, config.models.folder, config.models.checkpoint_file
-        ),
-    )
-    model = model.eval()
-    return model
-
-
 def load_model(
-    config: DictConfig,
     df_metadata: pd.DataFrame,
     num_species: int,
     num_genus: int,
     num_family: int,
     num_organ: int,
     num_plant: int,
+    model_config: DictConfig,
+    project_path: str,
 ) -> nn.Module:
-    if config.models.load_5heads_model:
+    if model_config.load_5heads_model:
         model_path = os.path.join(
-            config.project_path,
-            config.models.folder,
-            config.models.checkpoint_file,
+            project_path,
+            model_config.folder,
+            model_config.checkpoint_file,
             "model.safetensors",
         )
         backbone = timm.create_model(
-            config.models.name,
+            model_config.name,
             pretrained=False,
             num_classes=num_species,
         )
@@ -61,15 +49,19 @@ def load_model(
             num_labels_genus=num_genus,
             num_labels_family=num_family,
             num_labels_plant=num_plant,
-            freeze_backbone=config.models.freeze_backbone,
-            freeze_species_head=config.models.freeze_species_head,
-            classifier_type=config.models.classifier_type,
+            freeze_backbone=model_config.freeze_backbone,
+            freeze_species_head=model_config.freeze_species_head,
+            classifier_type=model_config.classifier_type,
         )
         safetensors.torch.load_model(model, model_path)
     else:
-        model = load_timm_model(
-            config=config,
+        model = timm.create_model(
+            model_config.name,
+            pretrained=model_config.pretrained,
             num_classes=len(df_metadata["species_id"].unique()),
+            checkpoint_path=os.path.join(
+                project_path, model_config.folder, model_config.checkpoint_file
+            ),
         )
         model = ViTMultiHeadClassifier(
             backbone=model,
@@ -78,9 +70,9 @@ def load_model(
             num_labels_genus=num_genus,
             num_labels_family=num_family,
             num_labels_plant=num_plant,
-            freeze_backbone=config.models.freeze_backbone,
-            freeze_species_head=config.models.freeze_species_head,
-            classifier_type=config.models.classifier_type,
+            freeze_backbone=model_config.freeze_backbone,
+            freeze_species_head=model_config.freeze_species_head,
+            classifier_type=model_config.classifier_type,
         )
     return model
 

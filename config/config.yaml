@@ -42,6 +42,36 @@ models:
   freeze_species_head: false # if true, just keep the original species head
   classifier_type: "one_layer" # ["one_layer", "two_layer_act"]
 
+merge:
+  enabled: False # only for 5 heads model
+  species_model:
+    load_5heads_model: False # if true, load the 5 heads model
+    pretrained: False
+    name: "vit_base_patch14_reg4_dinov2.lvd142m"
+    folder: "models/"
+    checkpoint_file: "model_onlyclassifier_then_all/model_best.pth.tar"
+    classifier_type: "one_layer" # ["one_layer", "two_layer_act"]
+    freeze_backbone: True # if true, freeze the backbone
+    freeze_species_head: False # if true, just keep the original species head
+  genus_model:
+    load_5heads_model: True # if true, load the 5 heads model
+    name: "vit_base_patch14_reg4_dinov2.lvd142m"
+    pretrained: False
+    folder: "models/"
+    checkpoint_file: "saved_models/5heads_vit_base_patch14_reg4_dinov2.lvd142m-classifier-then-all-2layers/checkpoint_ep2_it4000/"
+    classifier_type: "two_layer_act" # ["one_layer", "two_layer_act"]
+    freeze_backbone: True # if true, freeze the backbone
+    freeze_species_head: False # if true, just keep the original species head
+  family_model:
+    load_5heads_model: True # if true, load the 5 heads model
+    pretrained: False
+    name: "vit_base_patch14_reg4_dinov2.lvd142m"
+    folder: "models/"
+    checkpoint_file: "saved_models/5heads_vit_base_patch14_reg4_dinov2.lvd142m-classifier-then-all-2layers/checkpoint_ep2_it4000/"
+    classifier_type: "two_layer_act" # ["one_layer", "two_layer_act"]
+    freeze_backbone: True # if true, freeze the backbone
+    freeze_species_head: False # if true, just keep the original species head
+
 training:
   enabled: true # if true, train the model
   use_all_data: false # if true, use all data for training
