@@ -41,8 +41,10 @@ models:
   freeze_backbone: true # if true, freeze the backbone
   freeze_species_head: false # if true, just keep the original species head
   classifier_type: "one_layer" # ["one_layer", "two_layer_act"]
+  freeze_plant_head: True # if true, freeze the plant head
+  freeze_organ_head: True # if true, freeze the organ head
 
-merge:
+merge:  # inference only
   enabled: False # only for 5 heads model
   species_model:
     load_5heads_model: False # if true, load the 5 heads model

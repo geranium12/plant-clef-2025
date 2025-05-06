@@ -18,6 +18,8 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore
         freeze_backbone: bool = True,
         freeze_species_head: bool = False,
         classifier_type: str = "one_layer",  # Options: "one_layer", "two_layer_act"
+        freeze_plant_head: bool = False,
+        freeze_organ_head: bool = False,
     ) -> None:
         super().__init__()
 
@@ -64,10 +66,20 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore
 
         # Optionally freeze backbone parameters.
         if freeze_backbone:
+            print("Freezing backbone parameters.")
             for param in self.backbone.parameters():
                 param.requires_grad = False
         if freeze_species_head:
+            print("Freezing species head parameters.")
             for param in self.classifier_species.parameters():
+                param.requires_grad = False
+        if freeze_plant_head:
+            print("Freezing plant head parameters.")
+            for param in self.classifier_plant.parameters():
+                param.requires_grad = False
+        if freeze_organ_head:
+            print("Freezing organ head parameters.")
+            for param in self.classifier_organ.parameters():
                 param.requires_grad = False
 
         self.head_names = ["species", "genus", "family", "plant", "organ"]

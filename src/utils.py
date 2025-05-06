@@ -52,6 +52,8 @@ def load_model(
             freeze_backbone=model_config.freeze_backbone,
             freeze_species_head=model_config.freeze_species_head,
             classifier_type=model_config.classifier_type,
+            freeze_plant_head=model_config.freeze_plant_head,
+            freeze_organ_head=model_config.freeze_organ_head,
         )
         safetensors.torch.load_model(model, model_path)
     else:
@@ -73,6 +75,8 @@ def load_model(
             freeze_backbone=model_config.freeze_backbone,
             freeze_species_head=model_config.freeze_species_head,
             classifier_type=model_config.classifier_type,
+            freeze_plant_head=model_config.freeze_plant_head,
+            freeze_organ_head=model_config.freeze_organ_head,
         )
     return model
 
