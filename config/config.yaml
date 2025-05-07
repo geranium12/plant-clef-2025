@@ -83,6 +83,7 @@ prediction:
   BMA:
     z_score_threshold: 2.0
   filter_species_threshold: 100 # The predictions for images with less than this number of images will be filtered out
+  combine_same_plot_threshold: 0 # The number of predictions required for a species to be added to the combined prediction of a plot at the same location. 0 to disable plot combination
 
 image_width: 518
 image_height: 518

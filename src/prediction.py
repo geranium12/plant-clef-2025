@@ -302,4 +302,41 @@ def predict(
                     f"Time {batch_time.val:.3f} ({batch_time.avg:.3f})"
                 )
 
+    if config.prediction.combine_same_plot_threshold > 0:
+
+        def extract_plot_name(image_path: str) -> str:
+            match image_path:
+                case t if "CBN-PdlC" in t or "CBN-Pla" in t:
+                    return t[:-9]
+                case t:
+                    return t
+
+        image_plot_predictions: dict[str, list[list[int]]] = {}
+        for image_path, prediction in image_predictions.items():
+            plot_name = extract_plot_name(image_path)
+            if plot_name not in image_plot_predictions:
+                image_plot_predictions[plot_name] = []
+            image_plot_predictions[plot_name].append(prediction)
+
+        combined_plot_predictions = {}
+        for image_path in image_predictions.keys():
+            predictions = image_plot_predictions[extract_plot_name(image_path)]
+            if len(predictions) == 1:
+                combined_plot_predictions[image_path] = predictions[0]
+                continue
+
+            prediction_count: dict[int, int] = {}
+            for prediction in predictions:
+                for predicted_species in prediction:
+                    prediction_count[predicted_species] = (
+                        prediction_count.get(predicted_species, 0) + 1
+                    )
+            combined_prediction = [
+                predicted_species
+                for predicted_species, count in prediction_count.items()
+                if count >= config.prediction.combine_same_plot_threshold
+            ]
+            combined_plot_predictions[image_path] = combined_prediction
+        image_predictions = combined_plot_predictions
+
     return image_predictions
