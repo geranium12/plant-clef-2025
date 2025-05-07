@@ -80,8 +80,8 @@ merge:
 training:
   enabled: True # if true, train the model
   use_all_data: False # if true, use all data for training
-  val_size: 0.01 # 0.05
-  test_size: 0.983 #0.05
+  val_size: 0.05
+  test_size: 0.05
   batch_size: 32
   shuffle: True
   num_workers: 8
@@ -130,7 +130,7 @@ prediction:
   kernel:
     enabled: False # if true, add weighted neighbor prediction to a tile
     kernel_type: "simple" # One of ["simple"]
-  crop_side_percent: 0.05 # The percentage of the image to crop from each side; if <= 0, use the whole image
+  crop_side_percent: -1 # The percentage of the image to crop from each side; if <= 0, use the whole image
 
 
 
