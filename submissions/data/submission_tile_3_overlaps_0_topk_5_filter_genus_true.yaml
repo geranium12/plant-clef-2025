@@ -1,0 +1,10 @@
+score: 0.25575
+prediction:
+  tiling:
+    scales:
+      - 3.0
+    overlaps:
+      - 0.0
+  top_k_tile:
+    k: 5
+  filter_genus: True

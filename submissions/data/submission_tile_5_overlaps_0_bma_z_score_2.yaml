@@ -1,0 +1,10 @@
+score: 0.22076
+prediction:
+  tiling:
+    scales:
+      - 5.0
+    overlaps:
+      - 0.0
+  method: "BMA"
+  BMA:
+    z_score_threshold: 2.0
