@@ -121,6 +121,9 @@ prediction:
   BMA:
     z_score_threshold: 2.0
   filter_species_threshold: 100 # The predictions for images with less than this number of images will be filtered out
+  kernel:
+    enabled: True # if true, add weighted neighbor prediction to a tile
+    kernel_type: "simple" # One of ["simple"]
 
 image_width: 518
 image_height: 518

@@ -3,6 +3,7 @@ import time
 
 import pandas as pd
 import torch
+import torch.nn as nn
 import torchvision.transforms as ttransforms
 from accelerate import Accelerator
 from omegaconf import DictConfig
@@ -270,6 +271,60 @@ def predict(
                         if image_tile_probabilities is None
                         else torch.cat((image_tile_probabilities, probabilities), dim=0)
                     )
+
+            # FIXME: make it work for multiple scales
+            # Works only for integer scales
+            if config.prediction.kernel.enabled:
+                if config.prediction.kernel.type == "simple":
+                    kernel = torch.tensor(
+                        [
+                            [0.5, 0.5, 0.5],
+                            [0.5, 1, 0.5],
+                            [0.5, 0.5, 0.5],
+                        ],
+                        dtype=torch.float32,
+                    ).to(image_tile_probabilities.device)
+                    print(f"{image_tile_probabilities.shape = }")
+                    num_classes = image_tile_probabilities.shape[1]
+                    image_tile_probs_grid = (
+                        image_tile_probabilities.reshape(
+                            (
+                                int(config.prediction.tiling.scales[0]),
+                                int(config.prediction.tiling.scales[0]),
+                                num_classes,
+                            )
+                        )
+                        .permute(2, 0, 1)
+                        .unsqueeze(0)
+                    )  # Shape: [1, num_classes, tile_size, tile_size]
+                    print(f"{image_tile_probs_grid.shape = }")
+                    print(f"{kernel.shape = }")
+                    conv = nn.Conv2d(
+                        in_channels=num_classes,
+                        out_channels=num_classes,
+                        kernel_size=kernel.shape[0],
+                        padding=1,
+                        groups=num_classes,
+                        bias=False,
+                    )
+                    conv.weight.data = kernel.repeat(
+                        num_classes, 1, 1, 1
+                    )  # Tile kernel for all classes
+                    weighted_probs = conv(
+                        image_tile_probs_grid
+                    )  # Shape: [1, num_classes, tile_size, tile_size]
+                    print(f"{weighted_probs.shape = }")
+                    final_probs = weighted_probs.squeeze(0).permute(
+                        1, 2, 0
+                    )  # Shape: [tile_size, tile_size, num_classes]
+                    final_probs = final_probs.reshape(
+                        (
+                            int(config.prediction.tiling.scales[0])
+                            * int(config.prediction.tiling.scales[0]),
+                            num_classes,
+                        )
+                    )  # Shape: [tile_size * tile_size, num_classes]
+                    print(f"{final_probs.shape = }")
 
             image_results: dict[int, float] = {}
             match config.prediction.method:
