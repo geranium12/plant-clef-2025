@@ -308,6 +308,8 @@ def predict(
             match image_path:
                 case t if "CBN-PdlC" in t or "CBN-Pla" in t:
                     return t[:-9]
+                case t if "GUARDEN-CBNMed" in t:
+                    return t[: t.index("-", 15)]
                 case t:
                     return t
 
