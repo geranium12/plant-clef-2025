@@ -52,6 +52,7 @@ class MultitileDataset(Dataset):  # type: ignore[misc]
         tile_size: int = 518,
         scales: list[float] | None = None,
         overlaps: list[float] | None = None,
+        crop_side_percent: float = 0.0,
     ) -> None:
         self.image_folder = image_folder
         self.image_paths = [
@@ -61,6 +62,7 @@ class MultitileDataset(Dataset):  # type: ignore[misc]
             )
             for f in os.listdir(image_folder)
         ]
+
         self.transform = ttransforms.ToTensor()
 
         self.scales = scales if scales is not None else [1.0]
@@ -69,6 +71,7 @@ class MultitileDataset(Dataset):  # type: ignore[misc]
             "Same number of scales and overlaps should be provided"
         )
         self.tile_size = tile_size
+        self.crop_side_percent = crop_side_percent
 
     def __len__(self) -> int:
         return len(self.image_paths)
@@ -77,6 +80,13 @@ class MultitileDataset(Dataset):  # type: ignore[misc]
         image_path = self.image_paths[idx]
         image = Image.open(image_path)
         image = image.convert("RGB")
+
+        if self.crop_side_percent > 0:
+            w, h = image.size
+            cropped_w = int(w * (1.0 - self.crop_side_percent))
+            cropped_h = int(h * (1.0 - self.crop_side_percent))
+            center_crop = ttransforms.CenterCrop((cropped_h, cropped_w))
+            image = center_crop(image)
 
         if self.transform:
             image = self.transform(image).unsqueeze(0)

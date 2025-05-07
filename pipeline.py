@@ -181,6 +181,7 @@ def pipeline(
             tile_size=model_info.input_size,
             scales=config.prediction.tiling.scales,
             overlaps=config.prediction.tiling.overlaps,
+            crop_side_percent=config.prediction.crop_side_percent,
         ),
         batch_size=1,  # config.training.batch_size, TODO: FIX
         num_workers=config.training.num_workers,
