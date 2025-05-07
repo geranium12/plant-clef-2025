@@ -307,11 +307,17 @@ def predict(
         def extract_plot_name(image_path: str) -> str:
             match image_path:
                 case t if "CBN-PdlC" in t or "CBN-Pla" in t:
-                    return t[:-9]
+                    plot_name = t[:-9]
                 case t if "GUARDEN-CBNMed" in t:
-                    return t[: t.index("-", 15)]
+                    plot_name = t[: t.index("-", 15)]
                 case t:
                     return t
+
+            if config.prediction.group_same_plot_by_year:
+                year = image_path[-8:-4]
+                plot_name = f"{plot_name}_{year}"
+
+            return plot_name
 
         image_plot_predictions: dict[str, list[list[int]]] = {}
         for image_path, prediction in image_predictions.items():
