@@ -74,15 +74,27 @@ def top_k_tile_prediction(
             top_prob,
         ) in zip(top_tile_indices, top_tile_probs):
             species_id = species_index_to_id[top_idx]
+            top_prob = top_prob.item()
             # Update the results dictionary only if the probability is higher
             if top_prob > min_score:
-                if top_idx not in image_results or image_results[species_id] < top_prob:
+                if (
+                    species_id not in image_results
+                    or image_results[species_id] < top_prob
+                ):
                     image_results[species_id] = top_prob
 
     if top_n > 0:
         image_results = dict(
             sorted(image_results.items(), key=lambda x: x[1], reverse=True)[:top_n]
         )
+
+    if len(image_results) == 0:
+        # If no species is found, return the top 1 species with the highest probabilities over all tiles
+        flattened_probs = tiles_probabilities.flatten()
+        idx = flattened_probs.argmax()
+        class_id = idx % tiles_probabilities.shape[1]
+        class_id = species_index_to_id[class_id.item()]
+        image_results = {class_id: flattened_probs[idx].item()}
 
     return image_results
 
@@ -278,13 +290,12 @@ def predict(
                 if config.prediction.kernel.type == "simple":
                     kernel = torch.tensor(
                         [
-                            [0.5, 0.5, 0.5],
+                            [0.25, 0.5, 0.25],
                             [0.5, 1, 0.5],
-                            [0.5, 0.5, 0.5],
+                            [0.25, 0.5, 0.25],
                         ],
                         dtype=torch.float32,
                     ).to(image_tile_probabilities.device)
-                    print(f"{image_tile_probabilities.shape = }")
                     num_classes = image_tile_probabilities.shape[1]
                     image_tile_probs_grid = (
                         image_tile_probabilities.reshape(
@@ -297,8 +308,6 @@ def predict(
                         .permute(2, 0, 1)
                         .unsqueeze(0)
                     )  # Shape: [1, num_classes, tile_size, tile_size]
-                    print(f"{image_tile_probs_grid.shape = }")
-                    print(f"{kernel.shape = }")
                     conv = nn.Conv2d(
                         in_channels=num_classes,
                         out_channels=num_classes,
@@ -313,7 +322,6 @@ def predict(
                     weighted_probs = conv(
                         image_tile_probs_grid
                     )  # Shape: [1, num_classes, tile_size, tile_size]
-                    print(f"{weighted_probs.shape = }")
                     final_probs = weighted_probs.squeeze(0).permute(
                         1, 2, 0
                     )  # Shape: [tile_size, tile_size, num_classes]
@@ -324,7 +332,6 @@ def predict(
                             num_classes,
                         )
                     )  # Shape: [tile_size * tile_size, num_classes]
-                    print(f"{final_probs.shape = }")
 
             image_results: dict[int, float] = {}
             match config.prediction.method:
