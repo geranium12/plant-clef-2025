@@ -3,7 +3,6 @@ import os
 import pickle
 
 import hydra
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from accelerate import Accelerator
@@ -11,22 +10,15 @@ from omegaconf import (
     DictConfig,
     OmegaConf,
 )
-from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import precision_recall_fscore_support
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import src.data as data
-from src import prediction, submission, training
 from src.augmentation import get_random_data_augmentation
 from src.data import NonPlantDataset, PlantDataset
-from src.data_manager import DataManager
 from src.utils import define_metrics, load_model
-from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 from utils.build_hierarchies import (
-    get_organ_number,
     get_plant_tree_number,
     read_plant_taxonomy,
 )
