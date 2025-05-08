@@ -261,20 +261,10 @@ def predict(
                         else:
                             probabilities[:, 1:] *= genus_probs * family_probs
 
-                        # print top 10 probabilities
-                        # top_probs, top_indices = torch.topk(probabilities, 5, dim=1)
-                        # torch.set_printoptions(threshold=8)
-                        # print(
-                        #     f"Top 10 probabilities for {quadrat_id}: {top_probs}, {top_indices}"
-                        # )
-                        # apply softmax to the combined probabilities
-                        # probabilities = torch.nn.functional.softmax(
-                        #     probabilities, dim=1
-                        # )
-                        # top_probs, top_indices = torch.topk(probabilities, 5, dim=1)
-                        # print(
-                        #     f"Top 10 probabilities after softmax for {quadrat_id}: {top_probs}, {top_indices}"
-                        # )
+                        # Normalize the probabilities
+                        probabilities = probabilities / torch.sum(
+                            probabilities, dim=1, keepdim=True
+                        )
                     else:
                         probabilities = probabilities_species
 
