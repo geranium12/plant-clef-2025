@@ -98,7 +98,7 @@ training:
     organ: 1.0
 
 evaluating:
-  every: 3
+  every: 4000
   batch_size: 32
   shuffle: True
   num_workers: 8
