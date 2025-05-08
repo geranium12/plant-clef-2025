@@ -419,6 +419,15 @@ def predict(
                     prediction_count[predicted_species] = (
                         prediction_count.get(predicted_species, 0) + 1
                     )
+
+            # Keep prediction if combining would yield empty prediction
+            if not any(
+                count >= config.prediction.combine_same_plot_threshold
+                for count in prediction_count.values()
+            ):
+                combined_plot_predictions[image_path] = predictions[0]
+                continue
+
             combined_prediction = [
                 predicted_species
                 for predicted_species, count in prediction_count.items()
