@@ -196,15 +196,17 @@ def predict(
             quadrat_id = os.path.splitext(os.path.basename(image_path[0]))[0]
             
             if config.prediction.predict_no_plant:
+                nonplant_threshold = 0.5
                 shps = patches[0].shape
                 color_counts = np.round((10 * patches[0]).cpu().numpy()).reshape(shps[0], 3, -1)
                 color_counts[:,1] *= 11
                 color_counts[:,2] *= 121
                 color_counts = color_counts.sum(axis=1).astype('int')
                 color_counts = np.apply_along_axis(lambda x: np.bincount(x, minlength=11**3), axis=1, arr=color_counts)
-                prediction = noplant_predictor.predict(color_counts)
-                patches = [ patches[0][torch.tensor(prediction == 1)] ]
-                print(patches[0].shape)
+                prediction = noplant_predictor.predict_proba(color_counts)[:,noplant_predictor.classes_ == 1].squeeze()
+                indices = (prediction > nonplant_threshold) | (np.argsort(prediction) < 2)
+                new_patches = patches[0][indices]
+                patches = [ new_patches ]
                     
             
             transform_patch = ttransforms.Normalize(
