@@ -1,6 +1,8 @@
 import os
+import pickle
 import time
 
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -196,6 +198,13 @@ def predict(
     species_to_genus = torch.tensor(species_to_genus_list, dtype=torch.int64)
     species_to_family = torch.tensor(species_to_family_list, dtype=torch.int64)
 
+    if config.prediction.predict_no_plant_threshold > 0:
+        classifier_path = os.path.join(
+            config.project_path, config.models.folder, config.models.random_forest
+        )
+        with open(classifier_path, "rb") as fl:
+            noplant_predictor = pickle.load(fl)
+
     # Initialize batch time tracking
     batch_time = AverageMeter()
     end = time.time()
@@ -206,6 +215,27 @@ def predict(
             image_path,
         ) in enumerate(dataloader):
             quadrat_id = os.path.splitext(os.path.basename(image_path[0]))[0]
+
+            if config.prediction.predict_no_plant_threshold:
+                nonplant_threshold = config.prediction.predict_no_plant_threshold
+                shps = patches[0].shape
+                color_counts = np.round((10 * patches[0]).cpu().numpy()).reshape(
+                    shps[0], 3, -1
+                )
+                color_counts[:, 1] *= 11
+                color_counts[:, 2] *= 121
+                color_counts = color_counts.sum(axis=1).astype("int")
+                color_counts = np.apply_along_axis(
+                    lambda x: np.bincount(x, minlength=11**3), axis=1, arr=color_counts
+                )
+                prediction = noplant_predictor.predict_proba(color_counts)[
+                    :, noplant_predictor.classes_ == 1
+                ].squeeze()
+                indices = (prediction >= nonplant_threshold) | (
+                    np.argsort(-prediction) < 2
+                )
+                new_patches = patches[0][indices]
+                patches = [new_patches]
 
             patch_dataset = PatchDataset(
                 patches[0],

@@ -40,6 +40,7 @@ models:
     every: 1000
   freeze_backbone: true # if true, freeze the backbone
   freeze_species_head: false # if true, just keep the original species head
+  random_forest: "forest.pkl"
   classifier_type: "one_layer" # ["one_layer", "two_layer_act"]
   freeze_plant_head: True # if true, freeze the plant head
   freeze_organ_head: True # if true, freeze the organ head
@@ -81,7 +82,7 @@ training:
   test_size: 0.05
   batch_size: 144
   shuffle: True
-  num_workers: 1
+  num_workers: 4
   lr: 1e-4
   scheduler:
     factor: 0.1
@@ -123,6 +124,7 @@ prediction:
   filter_species_threshold: 100 # The predictions for images with less than this number of images will be filtered out
   combine_same_plot_threshold: 0 # The number of predictions required for a species to be added to the combined prediction of a plot at the same location. 0 to disable plot combination
   group_same_plot_by_year: false # if true and threshold is not 0, group the predictions of the same plot by year
+  predict_no_plant_threshold: 0  
   kernel:
     enabled: False # if true, add weighted neighbor prediction to a tile
     kernel_type: "simple" # One of ["simple"]
