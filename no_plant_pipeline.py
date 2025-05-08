@@ -5,32 +5,20 @@ import pickle
 import hydra
 import numpy as np
 import torch
-from accelerate import Accelerator
-from omegaconf import (
-    DictConfig,
-    OmegaConf,
-)
+from omegaconf import DictConfig
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_recall_fscore_support
 from tqdm import tqdm
 
 import src.data as data
-from src.augmentation import get_random_data_augmentation
 from src.data import NonPlantDataset, PlantDataset
-from src.utils import define_metrics, load_model
-from utils.build_hierarchies import (
-    get_plant_tree_number,
-    read_plant_taxonomy,
-)
 
 
 def pipeline(
     config: DictConfig,
 ) -> None:
-    df_metadata = data.load_metadata(config)
-
     print("get plant data")
-    plant_data_image_info, rare_species = data.get_plant_data_image_info(
+    plant_data_image_info, _ = data.get_plant_data_image_info(
         os.path.join(
             config.project_path,
             config.data.folder,
@@ -151,7 +139,7 @@ def pipeline(
         getattr(plant_data_split, "test_indices", None) if plant_data_split else None
     )
     non_plant_indices = (
-        getattr(non_plant_data_split, f"test_indices", None)
+        getattr(non_plant_data_split, "test_indices", None)
         if non_plant_data_split
         else None
     )
