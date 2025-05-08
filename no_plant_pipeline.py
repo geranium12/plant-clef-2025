@@ -132,12 +132,15 @@ def pipeline(
 
     print("Random Forest")
 
-    if os.path.isfile("./forest.pkl"):
-        with open("./forest.pkl", "rb") as fl_read:
+    classifier_path = os.path.join(config.project_path, config.models.folder, config.models.random_forest)
+    if os.path.isfile(classifier_path):
+        print("Loading Model")
+        with open(classifier_path, "rb") as fl_read:
             rndmfrst = pickle.load(fl_read)
     else:
+        print("Fitting Model")
         rndmfrst = RandomForestClassifier().fit(train_x, train_y)
-        with open("./forest.pkl", "wb") as fl_write:
+        with open(classifier_path, "wb") as fl_write:
             pickle.dump(rndmfrst, fl_write)
     y_pred = rndmfrst.predict(train_x)
     scores = precision_recall_fscore_support(train_y, y_pred)

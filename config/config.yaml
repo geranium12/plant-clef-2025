@@ -36,6 +36,7 @@ models:
     folder: "saved_models/5heads_all_labels_vit_base_patch14_reg4_dinov2.lvd142m"
     every: 1000
   freeze_species_head: false # if true, just keep the original species head
+  random_forest: "forest.pkl"
 
 training:
   enabled: true # if true, train the model
@@ -82,11 +83,7 @@ prediction:
     min_score: 0.1
   BMA:
     z_score_threshold: 2.0
-  predict_no_plant: false
-  filter_species_threshold: 100 # The predictions for images with less than this number of images will be filtered out
-  combine_same_plot_threshold: 0 # The number of predictions required for a species to be added to the combined prediction of a plot at the same location. 0 to disable plot combination
-  group_same_plot_by_year: false # if true and threshold is not 0, group the predictions of the same plot by year
-
+  predict_no_plant_threshold: 0.5
 image_width: 518
 image_height: 518
 
