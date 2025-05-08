@@ -44,7 +44,7 @@ training:
   test_size: 0.1
   batch_size: 144
   shuffle: True
-  num_workers: 1
+  num_workers: 4
   lr: 1e-4
   scheduler:
     factor: 0.1
@@ -82,7 +82,7 @@ prediction:
     min_score: 0.1
   BMA:
     z_score_threshold: 2.0
-
+  predict_no_plant: true
 image_width: 518
 image_height: 518
 

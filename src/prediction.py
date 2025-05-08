@@ -1,7 +1,10 @@
 import os
 import time
 from typing import Optional
+from sklearn.ensemble import RandomForestClassifier
+import pickle
 
+import numpy as np
 import pandas as pd
 import torch
 import torchvision.transforms as ttransforms
@@ -177,6 +180,10 @@ def predict(
     species_to_genus = torch.tensor(species_to_genus_list, dtype=torch.int64)
     species_to_family = torch.tensor(species_to_family_list, dtype=torch.int64)
 
+    if config.prediction.predict_no_plant:
+        with open('./forest.pkl', 'rb') as fl:
+            noplant_predictor = pickle.load(fl)
+
     # Initialize batch time tracking
     batch_time = AverageMeter()
     end = time.time()
@@ -187,6 +194,19 @@ def predict(
             image_path,
         ) in enumerate(dataloader):
             quadrat_id = os.path.splitext(os.path.basename(image_path[0]))[0]
+            
+            if config.prediction.predict_no_plant:
+                shps = patches[0].shape
+                color_counts = np.round((10 * patches[0]).cpu().numpy()).reshape(shps[0], 3, -1)
+                color_counts[:,1] *= 11
+                color_counts[:,2] *= 121
+                color_counts = color_counts.sum(axis=1).astype('int')
+                color_counts = np.apply_along_axis(lambda x: np.bincount(x, minlength=11**3), axis=1, arr=color_counts)
+                prediction = noplant_predictor.predict(color_counts)
+                patches = [ patches[0][torch.tensor(prediction == 1)] ]
+                print(patches[0].shape)
+                    
+            
             transform_patch = ttransforms.Normalize(
                 mean=model_info.mean,
                 std=model_info.std,
