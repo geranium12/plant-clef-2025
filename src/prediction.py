@@ -1,8 +1,7 @@
 import os
+import pickle
 import time
 from typing import Optional
-from sklearn.ensemble import RandomForestClassifier
-import pickle
 
 import numpy as np
 import pandas as pd
@@ -10,6 +9,7 @@ import torch
 import torchvision.transforms as ttransforms
 from accelerate import Accelerator
 from omegaconf import DictConfig
+from sklearn.ensemble import RandomForestClassifier
 from torch.amp import autocast
 from torch.utils.data import (
     DataLoader,
@@ -181,7 +181,7 @@ def predict(
     species_to_family = torch.tensor(species_to_family_list, dtype=torch.int64)
 
     if config.prediction.predict_no_plant:
-        with open('./forest.pkl', 'rb') as fl:
+        with open("./forest.pkl", "rb") as fl:
             noplant_predictor = pickle.load(fl)
 
     # Initialize batch time tracking
@@ -194,21 +194,28 @@ def predict(
             image_path,
         ) in enumerate(dataloader):
             quadrat_id = os.path.splitext(os.path.basename(image_path[0]))[0]
-            
+
             if config.prediction.predict_no_plant:
                 nonplant_threshold = 0.5
                 shps = patches[0].shape
-                color_counts = np.round((10 * patches[0]).cpu().numpy()).reshape(shps[0], 3, -1)
-                color_counts[:,1] *= 11
-                color_counts[:,2] *= 121
-                color_counts = color_counts.sum(axis=1).astype('int')
-                color_counts = np.apply_along_axis(lambda x: np.bincount(x, minlength=11**3), axis=1, arr=color_counts)
-                prediction = noplant_predictor.predict_proba(color_counts)[:,noplant_predictor.classes_ == 1].squeeze()
-                indices = (prediction > nonplant_threshold) | (np.argsort(-prediction) < 2)
+                color_counts = np.round((10 * patches[0]).cpu().numpy()).reshape(
+                    shps[0], 3, -1
+                )
+                color_counts[:, 1] *= 11
+                color_counts[:, 2] *= 121
+                color_counts = color_counts.sum(axis=1).astype("int")
+                color_counts = np.apply_along_axis(
+                    lambda x: np.bincount(x, minlength=11**3), axis=1, arr=color_counts
+                )
+                prediction = noplant_predictor.predict_proba(color_counts)[
+                    :, noplant_predictor.classes_ == 1
+                ].squeeze()
+                indices = (prediction > nonplant_threshold) | (
+                    np.argsort(-prediction) < 2
+                )
                 new_patches = patches[0][indices]
-                patches = [ new_patches ]
-                    
-            
+                patches = [new_patches]
+
             transform_patch = ttransforms.Normalize(
                 mean=model_info.mean,
                 std=model_info.std,
