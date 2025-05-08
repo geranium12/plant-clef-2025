@@ -1,5 +1,6 @@
 import os
 
+import pickle
 from tqdm import tqdm
 import torch
 import numpy as np
@@ -136,16 +137,20 @@ def pipeline(
         indices=non_plant_indices,
     )
 
+    total_size = min(len(plant_dataset),len(nonplant_dataset))
+    plant_mix = np.random.choice(len(plant_dataset), size=total_size, replace=False)
+    nonplant_mix = np.random.choice(len(nonplant_dataset), size=total_size, replace=False)
+
     X = []
     y = []
     for iteration, (batch_plant, batch_nonplant) in tqdm(
-        enumerate(zip(plant_dataset, nonplant_dataset)),
+        enumerate(zip(plant_mix, nonplant_mix)),
             desc="Bitches",
-            total=min(len(plant_dataset),len(nonplant_dataset)),
+            total=total_size,
     ):
         
-        image_plant, _, _ = batch_plant
-        image_nonplant, _, _ = batch_nonplant
+        image_plant, _, _ = plant_dataset[batch_plant]
+        image_nonplant, _, _ = nonplant_dataset[batch_nonplant]
         
         # Apply augmentation
         image_plant = image_plant.numpy().reshape(3, -1)
@@ -178,8 +183,14 @@ def pipeline(
     #print(A)
 
     print('Random Forest')
-    
-    rndmfrst = RandomForestClassifier().fit(X,y)
+
+    if os.path.isfile('./forest.pkl'):
+        with open('./forest.pkl', 'rb') as fl:
+            rndmfrst = pickle.load(fl)
+    else:
+        rndmfrst = RandomForestClassifier().fit(X,y)
+        with open('./forest.pkl', 'wb') as fl:
+            pickle.dump(rndmfrst, fl)
     y_pred = rndmfrst.predict(X)
     A = precision_recall_fscore_support(y,y_pred)
     print(A)
@@ -214,17 +225,22 @@ def pipeline(
 
     gc.collect()
 
+    
+    total_size = min(len(plant_dataset),len(nonplant_dataset))
+    plant_mix = np.random.choice(len(plant_dataset), size=total_size, replace=False)
+    nonplant_mix = np.random.choice(len(nonplant_dataset), size=total_size, replace=False)
+    
     X_test = []
     y_test = []
     for iteration, (batch_plant, batch_nonplant) in tqdm(
-        enumerate(zip(plant_dataset, nonplant_dataset)),
+        enumerate(zip(plant_mix, nonplant_mix)),
             desc="Bitches",
-            total=min(len(plant_dataset),len(nonplant_dataset)),
+            total=total_size,
     ):
         
-        image_plant, _, _ = batch_plant
-        image_nonplant, _, _ = batch_nonplant
-        
+        image_plant, _, _ = plant_dataset[batch_plant]
+        image_nonplant, _, _ = nonplant_dataset[batch_nonplant]
+
         # Apply augmentation
         
         image_plant = image_plant.numpy().reshape(3, -1)
