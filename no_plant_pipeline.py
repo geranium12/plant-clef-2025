@@ -78,7 +78,7 @@ def pipeline(
     plant_tree = read_plant_taxonomy(config)
     _, num_labels_genus, num_labels_family = get_plant_tree_number(plant_tree)
 
-    print('combine treshlod')
+    print('combine threshold')
     if config.data.combine_classes_threshold > 0:
         used_species_ids = {
             info.species_id
