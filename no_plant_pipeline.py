@@ -153,19 +153,16 @@ def pipeline(
         image_nonplant, _, _ = nonplant_dataset[batch_nonplant]
         
         # Apply augmentation
-        image_plant = image_plant.numpy().reshape(3, -1)
-        image_plant = np.round(10 * image_plant, decimals=0).astype(int)
-        image_plant[1] *= 11
-        image_plant[2] *= 121
-        image_plant = image_plant.sum(axis=0)
-        image_plant = np.bincount(image_plant, minlength=11**3)
+        def apply_image_augmentation(image):
+            image = image.numpy().reshape(3, -1)
+            image = np.round(10 * image, decimals=0).astype(int)
+            image[1] *= 11
+            image[2] *= 121
+            image = image.sum(axis=0)
+            return np.bincount(image, minlength=11**3)
 
-        image_nonplant = image_nonplant.numpy().reshape(3, -1)
-        image_nonplant = np.round(10 * image_nonplant, decimals=0).astype(int)
-        image_nonplant[1] *= 11
-        image_nonplant[2] *= 121
-        image_nonplant = image_nonplant.sum(axis=0)
-        image_nonplant = np.bincount(image_nonplant, minlength=11**3)
+        image_plant = apply_image_augmentation(image_plant)
+        image_nonplant = apply_image_augmentation(image_nonplant)
         
         
         
