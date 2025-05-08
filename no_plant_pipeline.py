@@ -145,7 +145,7 @@ def pipeline(
     y = []
     for iteration, (batch_plant, batch_nonplant) in tqdm(
         enumerate(zip(plant_mix, nonplant_mix)),
-            desc="Bitches",
+            desc="Processing Batches",
             total=total_size,
     ):
         
