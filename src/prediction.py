@@ -180,7 +180,7 @@ def predict(
     species_to_genus = torch.tensor(species_to_genus_list, dtype=torch.int64)
     species_to_family = torch.tensor(species_to_family_list, dtype=torch.int64)
 
-    if config.prediction.predict_no_plant:
+    if config.prediction.predict_no_plant_threshold > 0:
         with open("./forest.pkl", "rb") as fl:
             noplant_predictor = pickle.load(fl)
 
@@ -195,8 +195,8 @@ def predict(
         ) in enumerate(dataloader):
             quadrat_id = os.path.splitext(os.path.basename(image_path[0]))[0]
 
-            if config.prediction.predict_no_plant:
-                nonplant_threshold = 0.5
+            if config.prediction.predict_no_plant_threshold:
+                nonplant_threshold = config.prediction.predict_no_plant_threshold
                 shps = patches[0].shape
                 color_counts = np.round((10 * patches[0]).cpu().numpy()).reshape(
                     shps[0], 3, -1
@@ -210,7 +210,7 @@ def predict(
                 prediction = noplant_predictor.predict_proba(color_counts)[
                     :, noplant_predictor.classes_ == 1
                 ].squeeze()
-                indices = (prediction > nonplant_threshold) | (
+                indices = (prediction >= nonplant_threshold) | (
                     np.argsort(-prediction) < 2
                 )
                 new_patches = patches[0][indices]
