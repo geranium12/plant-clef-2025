@@ -26,7 +26,6 @@ from utils.build_hierarchies import (
 
 def pipeline(
     config: DictConfig,
-    accelerator: Accelerator,
 ) -> None:
     df_metadata = data.load_metadata(config)
 
@@ -65,36 +64,6 @@ def pipeline(
         )
     )
 
-    print("plant tree")
-    plant_tree = read_plant_taxonomy(config)
-    _, num_labels_genus, num_labels_family = get_plant_tree_number(plant_tree)
-
-    print("combine threshold")
-    if config.data.combine_classes_threshold > 0:
-        used_species_ids = {
-            info.species_id
-            for info in plant_data_image_info
-            if info.species_id not in rare_species
-        }
-        species_id_to_index = {
-            sid: idx + 1 for idx, sid in enumerate(sorted(used_species_ids))
-        }
-        for sid in rare_species:
-            species_id_to_index[sid] = 0
-        species_index_to_id = {
-            species_id_to_index[sid]: sid for sid in used_species_ids
-        }
-        assert 0 not in species_index_to_id
-        assert 0 not in species_id_to_index
-        species_index_to_id[0] = 0
-    else:
-        species_id_to_index = {
-            sid: idx
-            for idx, sid in enumerate(
-                sorted({info.species_id for info in plant_data_image_info})
-            )
-        }
-        species_index_to_id = {idx: sid for sid, idx in species_id_to_index.items()}
 
     print("data manager")
     # Initialize data management
@@ -238,26 +207,9 @@ def pipeline(
 def main(
     config: DictConfig,
 ) -> None:
-    accelerator = Accelerator(log_with="wandb")
-    accelerator.init_trackers(
-        config.project_name,
-        config=OmegaConf.to_container(config),
-        init_kwargs={
-            "wandb": {
-                "name": f"{config.models.name}_{'pretrained' if config.models.pretrained else 'from-scratch'}",
-                "mode": "disabled",
-            }
-        },
-    )
+    
+    pipeline(config)
 
-    if accelerator.is_main_process:
-        define_metrics()
-
-    # NOTE: accelerator logs on main process only -> loss from only one GPU is logged
-    # Gathering loss from all GPUs will slow down training
-    pipeline(config, accelerator)
-
-    accelerator.end_training()
 
 
 if __name__ == "__main__":
