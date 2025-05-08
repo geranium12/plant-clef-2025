@@ -103,7 +103,7 @@ def pipeline(
         getattr(plant_data_split, "train_indices", None) if plant_data_split else None
     )
     non_plant_indices = (
-        getattr(non_plant_data_split, f"train_indices", None)
+        getattr(non_plant_data_split, "train_indices", None)
         if non_plant_data_split
         else None
     )
