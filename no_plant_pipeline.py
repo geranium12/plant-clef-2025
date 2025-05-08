@@ -125,7 +125,7 @@ def pipeline(
         indices=non_plant_indices,
     )
 
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(seed=config.seed)
 
     # Apply augmentation
     def apply_image_augmentation(image: torch.Tensor) -> np.ndarray:
