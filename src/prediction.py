@@ -181,7 +181,9 @@ def predict(
     species_to_family = torch.tensor(species_to_family_list, dtype=torch.int64)
 
     if config.prediction.predict_no_plant_threshold > 0:
-        classifier_path = os.path.join(config.project_path, config.models.folder, config.models.random_forest)
+        classifier_path = os.path.join(
+            config.project_path, config.models.folder, config.models.random_forest
+        )
         with open(classifier_path, "rb") as fl:
             noplant_predictor = pickle.load(fl)
 

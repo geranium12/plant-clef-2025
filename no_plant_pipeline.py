@@ -64,7 +64,6 @@ def pipeline(
         )
     )
 
-
     print("data manager")
     # Initialize data management
 
@@ -132,7 +131,9 @@ def pipeline(
 
     print("Random Forest")
 
-    classifier_path = os.path.join(config.project_path, config.models.folder, config.models.random_forest)
+    classifier_path = os.path.join(
+        config.project_path, config.models.folder, config.models.random_forest
+    )
     if os.path.isfile(classifier_path):
         print("Loading Model")
         with open(classifier_path, "rb") as fl_read:
@@ -190,7 +191,7 @@ def pipeline(
 
         image_plant = apply_image_augmentation(image_plant)
         image_nonplant = apply_image_augmentation(image_nonplant)
-        
+
         test_x.extend([image_plant, image_nonplant])
         test_y.extend([1, 0])
 
@@ -210,9 +211,7 @@ def pipeline(
 def main(
     config: DictConfig,
 ) -> None:
-    
     pipeline(config)
-
 
 
 if __name__ == "__main__":
