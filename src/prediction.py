@@ -204,7 +204,7 @@ def predict(
                 color_counts = color_counts.sum(axis=1).astype('int')
                 color_counts = np.apply_along_axis(lambda x: np.bincount(x, minlength=11**3), axis=1, arr=color_counts)
                 prediction = noplant_predictor.predict_proba(color_counts)[:,noplant_predictor.classes_ == 1].squeeze()
-                indices = (prediction > nonplant_threshold) | (np.argsort(prediction) < 2)
+                indices = (prediction > nonplant_threshold) | (np.argsort(-prediction) < 2)
                 new_patches = patches[0][indices]
                 patches = [ new_patches ]
                     
