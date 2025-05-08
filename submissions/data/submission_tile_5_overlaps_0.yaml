@@ -1,0 +1,7 @@
+score: 0.27135
+prediction:
+  tiling:
+    scales:
+      - 5.0
+    overlaps:
+      - 0.0

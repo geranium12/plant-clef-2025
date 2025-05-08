@@ -1,0 +1,13 @@
+score: 0.33452
+prediction:
+  use_genus_and_family: True
+  tiling:
+    scales:
+      - 5.0
+    overlaps:
+      - 0.0
+  top_k_tile:
+    k: 1
+    min_score: 0.01
+models:
+  checkpoint_file: "5heads_1layer"
