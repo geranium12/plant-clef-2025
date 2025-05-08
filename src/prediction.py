@@ -340,6 +340,7 @@ def predict(
                         prediction_count.get(predicted_species, 0) + 1
                     )
 
+            # Keep prediction if combining would yield empty prediction
             if not any(
                 count >= config.prediction.combine_same_plot_threshold
                 for count in prediction_count.values()
