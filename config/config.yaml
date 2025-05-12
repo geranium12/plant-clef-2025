@@ -119,6 +119,7 @@ prediction:
     k: 2
     min_score: 0.1
     top_n: -1 # if -1, use all predictions
+    bottom_n: 1 # if all species are below the threshold, get the bottom n species with the highest probs over all tiles
   BMA:
     z_score_threshold: 2.0
   filter_species_threshold: 100 # The predictions for images with less than this number of images will be filtered out

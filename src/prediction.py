@@ -53,6 +53,7 @@ def top_k_tile_prediction(
     top_k_tile: int,
     min_score: float,
     top_n: int,
+    bottom_n: int,
 ) -> dict[int, float]:
     image_results: dict[int, float] = {}
 
@@ -90,13 +91,18 @@ def top_k_tile_prediction(
             sorted(image_results.items(), key=lambda x: x[1], reverse=True)[:top_n]
         )
 
+    # TODO: Implement that there are always at least bottom_n predictions (between bottom_n and top_n)
     if len(image_results) == 0:
-        # If no species is found, return the top 1 species with the highest probabilities over all tiles
+        # If no species is found, return the bottom_n species with the highest probabilities over all tiles
+        # They might be the same species when they have the highest probs in different tiles
         flattened_probs = tiles_probabilities.flatten()
-        idx = flattened_probs.argmax()
-        class_id = idx % tiles_probabilities.shape[1]
-        class_id = species_index_to_id[class_id.item()]
-        image_results = {class_id: flattened_probs[idx].item()}
+        _, idx = flattened_probs.topk(bottom_n)
+        class_idx = idx % tiles_probabilities.shape[1]
+        class_idx = [species_index_to_id[class_id.item()] for class_id in class_idx]
+        image_results = {
+            class_id: flattened_probs[idx].item()
+            for idx, class_id in enumerate(class_idx)
+        }
 
     return image_results
 
@@ -291,10 +297,11 @@ def predict(
                         else:
                             probabilities[:, 1:] *= genus_probs * family_probs
 
-                        # Normalize the probabilities
-                        probabilities = probabilities / torch.sum(
-                            probabilities, dim=1, keepdim=True
-                        )
+                        # TODO: Currently, the normalization is turned off
+                        # # Normalize the probabilities
+                        # probabilities = probabilities / torch.sum(
+                        #     probabilities, dim=1, keepdim=True
+                        # )
                     else:
                         probabilities = probabilities_species
 
@@ -362,6 +369,7 @@ def predict(
                         top_k_tile=config.prediction.top_k_tile.k,
                         min_score=config.prediction.top_k_tile.min_score,
                         top_n=config.prediction.top_k_tile.top_n,
+                        bottom_n=config.prediction.top_k_tile.bottom_n,
                     )
                 case "BMA":
                     image_results = bma_prediction(
