@@ -2,19 +2,19 @@ import torchvision.transforms as ttransforms
 from omegaconf import DictConfig
 
 
-def get_random_data_augmentation(config: DictConfig) -> ttransforms.transforms:
+def get_random_data_augmentation() -> ttransforms.transforms:
     return ttransforms.Compose(
         [
+            ttransforms.RandomResizedCrop(size=(518, 518)),
             ttransforms.RandomHorizontalFlip(),
             ttransforms.RandomVerticalFlip(),
-            ttransforms.RandomRotation(30),
-            ttransforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
-            ttransforms.RandomResizedCrop(
-                size=(config.image_width, config.image_height)
+            ttransforms.RandomPerspective(distortion_scale=0.2),
+            ttransforms.RandomRotation(20),
+            ttransforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
+            ttransforms.ToTensor(),
+            ttransforms.Normalize(
+                mean=[0.4850, 0.4560, 0.4060], std=[0.2290, 0.2240, 0.2250]
             ),
-            ttransforms.RandomPerspective(distortion_scale=0.5),
-            ttransforms.RandomAdjustSharpness(sharpness_factor=2),
-            ttransforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5)),
         ]
     )
 

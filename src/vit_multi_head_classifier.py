@@ -17,8 +17,14 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore
         num_labels_species: int | None = None,
         freeze_backbone: bool = True,
         freeze_species_head: bool = False,
+        classifier_type: str = "one_layer",  # Options: "one_layer", "two_layer_act"
+        freeze_plant_head: bool = False,
+        freeze_organ_head: bool = False,
     ) -> None:
         super().__init__()
+
+        if not isinstance(num_labels_species, int) or num_labels_species <= 0:
+            raise ValueError("num_labels_species must be a positive integer.")
 
         # Deep copy the backbone and retrieve the hidden size
         self.backbone = deepcopy(backbone)
@@ -26,61 +32,83 @@ class ViTMultiHeadClassifier(nn.Module):  # type: ignore
         if hidden_size is None:
             raise AttributeError("Backbone must have a 'num_features' attribute.")
 
-        # Build species classifier using the backbone head if available,
-        # else fallback to a default classifier.
-        if hasattr(self.backbone, "head") and (
-            num_labels_species is None
-            or num_labels_species == self.backbone.head.out_features
+        if num_labels_species is None:
+            raise ValueError("num_labels_species must be provided.")
+
+        self.classifier_species = self._make_classifier(
+            hidden_size, num_labels_species, classifier_type
+        )
+        self.classifier_organ = self._make_classifier(
+            hidden_size, num_labels_organ, classifier_type
+        )
+        self.classifier_genus = self._make_classifier(
+            hidden_size, num_labels_genus, classifier_type
+        )
+        self.classifier_family = self._make_classifier(
+            hidden_size, num_labels_family, classifier_type
+        )
+        self.classifier_plant = self._make_classifier(
+            hidden_size, num_labels_plant, classifier_type
+        )
+
+        if hasattr(self.backbone, "head") and not isinstance(
+            self.backbone.head, nn.Identity
         ):
-            self.classifier_species = (
-                nn.Sequential(
-                    nn.Linear(hidden_size, hidden_size),
-                    nn.GELU(),
-                    deepcopy(self.backbone.head),
+            if num_labels_species != self.backbone.head.out_features:
+                raise ValueError(
+                    f"num_labels_species ({num_labels_species}) must match "
+                    f"the output size of the backbone head ({self.backbone.head.out_features})."
                 )
-                if not freeze_species_head
-                else nn.Sequential(deepcopy(self.backbone.head))
-            )
-            # Replace the backbone head with an identity function
+            self.classifier_species[-1] = deepcopy(self.backbone.head)
             self.backbone.head = nn.Identity()
             if hasattr(self.backbone, "head_drop"):
                 self.backbone.head_drop = nn.Identity()
-        else:
-            if num_labels_species is None:
-                raise ValueError(
-                    "num_labels_species must be provided if no head is available."
-                )
-            self.classifier_species = nn.Sequential(
-                nn.Linear(hidden_size, hidden_size),
-                nn.GELU(),
-                nn.Linear(hidden_size, num_labels_species),
-            )
-
-        # Create the remaining classifier heads using a helper method.
-        self.classifier_organ = self._make_classifier(hidden_size, num_labels_organ)
-        self.classifier_genus = self._make_classifier(hidden_size, num_labels_genus)
-        self.classifier_family = self._make_classifier(hidden_size, num_labels_family)
-        self.classifier_plant = self._make_classifier(hidden_size, num_labels_plant)
 
         # Optionally freeze backbone parameters.
         if freeze_backbone:
+            print("Freezing backbone parameters.")
             for param in self.backbone.parameters():
                 param.requires_grad = False
         if freeze_species_head:
+            print("Freezing species head parameters.")
             for param in self.classifier_species.parameters():
+                param.requires_grad = False
+        if freeze_plant_head:
+            print("Freezing plant head parameters.")
+            for param in self.classifier_plant.parameters():
+                param.requires_grad = False
+        if freeze_organ_head:
+            print("Freezing organ head parameters.")
+            for param in self.classifier_organ.parameters():
                 param.requires_grad = False
 
         self.head_names = ["species", "genus", "family", "plant", "organ"]
         self.pretrained_cfg = self.backbone.pretrained_cfg
 
-    @staticmethod
-    def _make_classifier(hidden_size: int, num_labels: int) -> nn.Sequential:
+        self.classifier_type = classifier_type
+
+    def _make_classifier(
+        self,
+        hidden_size: int,
+        num_labels: int,
+        classifier_type: str = "one_layer",
+    ) -> nn.Sequential:
         """Helper method that creates a classifier block."""
-        return nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.GELU(),
-            nn.Linear(hidden_size, num_labels),
-        )
+        if classifier_type == "one_layer":
+            return nn.Sequential(
+                nn.Linear(hidden_size, num_labels),
+            )
+        elif classifier_type == "two_layer_act":
+            return nn.Sequential(
+                nn.Linear(hidden_size, hidden_size),
+                nn.GELU(),
+                nn.Linear(hidden_size, num_labels),
+            )
+        else:
+            raise ValueError(
+                f"Invalid classifier_type '{classifier_type}'. "
+                "Expected 'one_layer' or 'two_layer_act'."
+            )
 
     def forward(
         self,

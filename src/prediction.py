@@ -1,25 +1,25 @@
 import os
 import pickle
 import time
-from typing import Optional
 
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 import torchvision.transforms as ttransforms
 from accelerate import Accelerator
 from omegaconf import DictConfig
-from sklearn.ensemble import RandomForestClassifier
 from torch.amp import autocast
 from torch.utils.data import (
     DataLoader,
 )
 
 from src.data import PatchDataset
-from src.training import (
-    ModelInfo,
+from src.utils import (
+    family_name_to_id,
+    genus_name_to_id,
+    species_id_to_name,
 )
-from src.utils import family_name_to_id, genus_name_to_id, species_id_to_name
 from utils.build_hierarchies import (
     check_utils_folder,
     get_genus_family_from_species,
@@ -52,6 +52,8 @@ def top_k_tile_prediction(
     species_index_to_id: dict[int, int],
     top_k_tile: int,
     min_score: float,
+    top_n: int,
+    bottom_n: int,
 ) -> dict[int, float]:
     image_results: dict[int, float] = {}
 
@@ -75,10 +77,32 @@ def top_k_tile_prediction(
             top_prob,
         ) in zip(top_tile_indices, top_tile_probs):
             species_id = species_index_to_id[top_idx]
+            top_prob = top_prob.item()
             # Update the results dictionary only if the probability is higher
             if top_prob > min_score:
-                if top_idx not in image_results or image_results[species_id] < top_prob:
+                if (
+                    species_id not in image_results
+                    or image_results[species_id] < top_prob
+                ):
                     image_results[species_id] = top_prob
+
+    if top_n > 0:
+        image_results = dict(
+            sorted(image_results.items(), key=lambda x: x[1], reverse=True)[:top_n]
+        )
+
+    # TODO: Implement that there are always at least bottom_n predictions (between bottom_n and top_n)
+    if len(image_results) == 0:
+        # If no species is found, return the bottom_n species with the highest probabilities over all tiles
+        # They might be the same species when they have the highest probs in different tiles
+        flattened_probs = tiles_probabilities.flatten()
+        _, idx = flattened_probs.topk(bottom_n)
+        class_idx = idx % tiles_probabilities.shape[1]
+        class_idx = [species_index_to_id[class_id.item()] for class_id in class_idx]
+        image_results = {
+            class_id: flattened_probs[idx].item()
+            for idx, class_id in enumerate(class_idx)
+        }
 
     return image_results
 
@@ -120,11 +144,11 @@ def predict(
     config: DictConfig,
     dataloader: DataLoader,
     model: torch.nn.Module,
-    model_info: ModelInfo,
     batch_size: int,
     species_index_to_id: dict[int, int],
     species_id_to_index: dict[int, int],
     accelerator: Accelerator,
+    transform_patch: ttransforms.transforms,
 ) -> dict[str, list[int]]:
     image_predictions: dict[str, list[int]] = {}
 
@@ -219,10 +243,6 @@ def predict(
                 new_patches = patches[0][indices]
                 patches = [new_patches]
 
-            transform_patch = ttransforms.Normalize(
-                mean=model_info.mean,
-                std=model_info.std,
-            )
             patch_dataset = PatchDataset(
                 patches[0],
                 transform=transform_patch,
@@ -277,6 +297,11 @@ def predict(
                         else:
                             probabilities[:, 1:] *= genus_probs * family_probs
 
+                        # TODO: Currently, the normalization is turned off
+                        # # Normalize the probabilities
+                        # probabilities = probabilities / torch.sum(
+                        #     probabilities, dim=1, keepdim=True
+                        # )
                     else:
                         probabilities = probabilities_species
 
@@ -286,6 +311,55 @@ def predict(
                         else torch.cat((image_tile_probabilities, probabilities), dim=0)
                     )
 
+            # FIXME: make it work for multiple scales
+            # Works only for integer scales
+            if config.prediction.kernel.enabled:
+                if config.prediction.kernel.type == "simple":
+                    kernel = torch.tensor(
+                        [
+                            [0.25, 0.5, 0.25],
+                            [0.5, 1, 0.5],
+                            [0.25, 0.5, 0.25],
+                        ],
+                        dtype=torch.float32,
+                    ).to(image_tile_probabilities.device)
+                    num_classes = image_tile_probabilities.shape[1]
+                    image_tile_probs_grid = (
+                        image_tile_probabilities.reshape(
+                            (
+                                int(config.prediction.tiling.scales[0]),
+                                int(config.prediction.tiling.scales[0]),
+                                num_classes,
+                            )
+                        )
+                        .permute(2, 0, 1)
+                        .unsqueeze(0)
+                    )  # Shape: [1, num_classes, tile_size, tile_size]
+                    conv = nn.Conv2d(
+                        in_channels=num_classes,
+                        out_channels=num_classes,
+                        kernel_size=kernel.shape[0],
+                        padding=1,
+                        groups=num_classes,
+                        bias=False,
+                    )
+                    conv.weight.data = kernel.repeat(
+                        num_classes, 1, 1, 1
+                    )  # Tile kernel for all classes
+                    weighted_probs = conv(
+                        image_tile_probs_grid
+                    )  # Shape: [1, num_classes, tile_size, tile_size]
+                    final_probs = weighted_probs.squeeze(0).permute(
+                        1, 2, 0
+                    )  # Shape: [tile_size, tile_size, num_classes]
+                    final_probs = final_probs.reshape(
+                        (
+                            int(config.prediction.tiling.scales[0])
+                            * int(config.prediction.tiling.scales[0]),
+                            num_classes,
+                        )
+                    )  # Shape: [tile_size * tile_size, num_classes]
+
             image_results: dict[int, float] = {}
             match config.prediction.method:
                 case "top_k_tile":
@@ -294,6 +368,8 @@ def predict(
                         species_index_to_id,
                         top_k_tile=config.prediction.top_k_tile.k,
                         min_score=config.prediction.top_k_tile.min_score,
+                        top_n=config.prediction.top_k_tile.top_n,
+                        bottom_n=config.prediction.top_k_tile.bottom_n,
                     )
                 case "BMA":
                     image_results = bma_prediction(

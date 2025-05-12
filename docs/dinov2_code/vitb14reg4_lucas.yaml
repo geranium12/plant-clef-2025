@@ -1,0 +1,38 @@
+custom_weights: /mnt/storage1/shared_data/plant_clef_2025/models/model_onlyclassifier_then_all/model_best.pth.tar
+# dino:
+#   head_n_prototypes: 131072
+#   head_bottleneck_dim: 384
+# ibot:
+#   separate_head: true
+#   head_n_prototypes: 131072
+train:
+  batch_size_per_gpu: 32
+  dataset_path: LucasPlantClef:root=/mnt/storage1/shared_data/plant_clef_2025/data/plant_clef_no_labels/
+  centering: sinkhorn_knopp
+  seed: 42
+  num_workers: 8
+  OFFICIAL_EPOCH_LENGTH: 1250
+student:
+  arch: vit_base
+  patch_size: 14
+  num_register_tokens: 4
+  # interpolate_antialias: true
+  # interpolate_offset: 0.0
+#   drop_path_rate: 0.4
+#   ffn_layer: swiglufused
+  # block_chunks: 4
+# teacher:
+#   momentum_teacher: 0.994
+optim:
+  epochs: 100
+  weight_decay: 0.0
+  base_lr: 0.1  # learning rate for a batch size of 1024
+  lr: 1e-3
+  warmup_epochs: 0
+crops:
+  local_crops_size: 98
+  global_crops_size: 518
+  global_crops_scale: [0.08, 1.0]
+  local_crops_scale: [0.05, 0.32]
+evaluation:
+  eval_period_iterations: -1

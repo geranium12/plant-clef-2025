@@ -1,6 +1,8 @@
 import os
+from dataclasses import dataclass
 
 import pandas as pd
+import safetensors
 import timm
 import torch
 import torch.nn as nn
@@ -8,18 +10,74 @@ from accelerate import Accelerator
 from omegaconf import DictConfig
 
 import wandb
+from src.vit_multi_head_classifier import ViTMultiHeadClassifier
 
 
-def load_model(config: DictConfig, num_classes: int) -> nn.Module:
-    model = timm.create_model(
-        config.models.name,
-        pretrained=config.models.pretrained,
-        num_classes=num_classes,
-        checkpoint_path=os.path.join(
-            config.project_path, config.models.folder, config.models.checkpoint_file
-        ),
-    )
-    model = model.eval()
+@dataclass
+class ModelInfo:
+    input_size: int
+    mean: float
+    std: float
+
+
+def load_model(
+    df_metadata: pd.DataFrame,
+    num_species: int,
+    num_genus: int,
+    num_family: int,
+    num_organ: int,
+    num_plant: int,
+    model_config: DictConfig,
+    project_path: str,
+) -> nn.Module:
+    if model_config.load_5heads_model:
+        model_path = os.path.join(
+            project_path,
+            model_config.folder,
+            model_config.checkpoint_file,
+            "model.safetensors",
+        )
+        backbone = timm.create_model(
+            model_config.name,
+            pretrained=False,
+            num_classes=num_species,
+        )
+        model = ViTMultiHeadClassifier(
+            backbone=backbone,
+            num_labels_species=num_species,
+            num_labels_organ=num_organ,
+            num_labels_genus=num_genus,
+            num_labels_family=num_family,
+            num_labels_plant=num_plant,
+            freeze_backbone=model_config.freeze_backbone,
+            freeze_species_head=model_config.freeze_species_head,
+            classifier_type=model_config.classifier_type,
+            freeze_plant_head=model_config.freeze_plant_head,
+            freeze_organ_head=model_config.freeze_organ_head,
+        )
+        safetensors.torch.load_model(model, model_path)
+    else:
+        model = timm.create_model(
+            model_config.name,
+            pretrained=model_config.pretrained,
+            num_classes=len(df_metadata["species_id"].unique()),
+            checkpoint_path=os.path.join(
+                project_path, model_config.folder, model_config.checkpoint_file
+            ),
+        )
+        model = ViTMultiHeadClassifier(
+            backbone=model,
+            num_labels_species=num_species,
+            num_labels_organ=num_organ,
+            num_labels_genus=num_genus,
+            num_labels_family=num_family,
+            num_labels_plant=num_plant,
+            freeze_backbone=model_config.freeze_backbone,
+            freeze_species_head=model_config.freeze_species_head,
+            classifier_type=model_config.classifier_type,
+            freeze_plant_head=model_config.freeze_plant_head,
+            freeze_organ_head=model_config.freeze_organ_head,
+        )
     return model
 
 

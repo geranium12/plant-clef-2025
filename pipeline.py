@@ -1,6 +1,7 @@
 import os
 
 import hydra
+import timm
 from accelerate import Accelerator
 from omegaconf import (
     DictConfig,
@@ -9,10 +10,10 @@ from omegaconf import (
 from torch.utils.data import DataLoader
 
 import src.data as data
-from src import prediction, submission, training
+from src import augmentation, prediction, submission, training
 from src.data_manager import DataManager
-from src.utils import define_metrics, load_model
-from src.vit_multi_head_classifier import ViTMultiHeadClassifier
+from src.merged_model import MergedModel
+from src.utils import ModelInfo, define_metrics, load_model
 from utils.build_hierarchies import (
     get_organ_number,
     get_plant_tree_number,
@@ -87,20 +88,67 @@ def pipeline(
         }
         species_index_to_id = {idx: sid for sid, idx in species_id_to_index.items()}
 
-    model = load_model(
-        config=config,
-        num_classes=len(df_metadata["species_id"].unique()),
+    if config.merge.enabled:
+        species_model = load_model(
+            model_config=config.merge.species_model,
+            df_metadata=df_metadata,
+            num_species=len(species_id_to_index),
+            num_genus=num_labels_genus,
+            num_family=num_labels_family,
+            num_organ=get_organ_number(df_metadata),
+            num_plant=1,
+            project_path=config.project_path,
+        )
+        genus_model = load_model(
+            model_config=config.merge.genus_model,
+            df_metadata=df_metadata,
+            num_species=len(species_id_to_index),
+            num_genus=num_labels_genus,
+            num_family=num_labels_family,
+            num_organ=get_organ_number(df_metadata),
+            num_plant=1,
+            project_path=config.project_path,
+        )
+        family_model = load_model(
+            model_config=config.merge.family_model,
+            df_metadata=df_metadata,
+            num_species=len(species_id_to_index),
+            num_genus=num_labels_genus,
+            num_family=num_labels_family,
+            num_organ=get_organ_number(df_metadata),
+            num_plant=1,
+            project_path=config.project_path,
+        )
+        model = MergedModel(
+            species_model=species_model,
+            genus_model=genus_model,
+            family_model=family_model,
+        )
+    else:
+        model = load_model(
+            model_config=config.models,
+            df_metadata=df_metadata,
+            num_species=len(species_index_to_id),
+            num_genus=num_labels_genus,
+            num_family=num_labels_family,
+            num_organ=get_organ_number(df_metadata),
+            num_plant=1,
+            project_path=config.project_path,
+        )
+
+    accelerator.print(model)
+
+    if config.merge.enabled:
+        data_config = timm.data.resolve_model_data_config(model.species_model)
+    else:
+        data_config = timm.data.resolve_model_data_config(model)
+    model_info = ModelInfo(
+        input_size=data_config["input_size"][1],  # Assuming (C, H, W)
+        mean=data_config["mean"],
+        std=data_config["std"],
     )
-    model = ViTMultiHeadClassifier(
-        backbone=model,
-        num_labels_organ=get_organ_number(df_metadata),
-        num_labels_genus=num_labels_genus,
-        num_labels_family=num_labels_family,
-        num_labels_plant=1,
-        num_labels_species=len(species_index_to_id),
-        freeze_species_head=config.models.freeze_species_head,
-    )
-    print(model)
+    accelerator.print(f"Model info: {model_info}")
+    accelerator.print(f"{timm.data.create_transform(**data_config, is_training=False)}")
 
     # Initialize data management
     data_manager = DataManager(
@@ -110,14 +158,18 @@ def pipeline(
         non_plant_data_split=non_plant_data_split,
         df_metadata=df_metadata,
         species_id_to_idx=species_id_to_index,
+        data_config=data_config,
+        random_transform=augmentation.get_random_data_augmentation(),
     )
 
-    model, model_info = training.train(
-        model=model,
-        data_manager=data_manager,
-        config=config,
-        accelerator=accelerator,
-    )
+    if not config.merge.enabled:
+        model = training.train(
+            model=model,
+            data_manager=data_manager,
+            config=config,
+            accelerator=accelerator,
+        )
+    model = accelerator.prepare(model)
 
     submission_dataloader = DataLoader(
         dataset=data.MultitileDataset(
@@ -129,6 +181,7 @@ def pipeline(
             tile_size=model_info.input_size,
             scales=config.prediction.tiling.scales,
             overlaps=config.prediction.tiling.overlaps,
+            crop_side_percent=config.prediction.crop_side_percent,
         ),
         batch_size=1,  # config.training.batch_size, TODO: FIX
         num_workers=config.training.num_workers,
@@ -140,11 +193,11 @@ def pipeline(
         config=config,
         dataloader=submission_dataloader,
         model=model,
-        model_info=model_info,
         batch_size=config.training.batch_size,
         species_index_to_id=species_index_to_id,
         species_id_to_index=species_id_to_index,
         accelerator=accelerator,
+        transform_patch=timm.data.create_transform(**data_config, is_training=False),
     )
 
     if config.prediction.filter_species_threshold > 0:

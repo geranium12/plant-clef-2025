@@ -1,8 +1,11 @@
 import os
 from dataclasses import dataclass
+from typing import Any
 
 import pandas as pd
+import timm
 import torch
+import torchvision
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader, Dataset
 
@@ -35,6 +38,8 @@ class DataManager:
     non_plant_data_split: DataSplit | None
     df_metadata: pd.DataFrame
     species_id_to_idx: dict[int, int]
+    data_config: dict[str, Any]
+    random_transform: torchvision.transforms
 
     def __post_init__(self) -> None:
         self._load_mappings_and_taxonomy()
@@ -74,6 +79,12 @@ class DataManager:
         )
         image_size = (self.config.image_width, self.config.image_height)
 
+        if split_type == "train" or plant_indices is None:
+            transform = self.random_transform
+        else:
+            transform = timm.data.create_transform(
+                **self.data_config, is_training=False
+            )
         datasets_to_concat = []
         if (
             plant_indices is not None or split_type == "train"
@@ -83,6 +94,7 @@ class DataManager:
                     plant_data_image_info=self.plant_data_image_info,
                     image_size=image_size,
                     indices=plant_indices,
+                    transform=transform,
                 )
             )
         if (
@@ -93,6 +105,7 @@ class DataManager:
                     image_folder=image_folder_other,
                     image_size=image_size,
                     indices=non_plant_indices,
+                    transform=transform,
                 )
             )
 
