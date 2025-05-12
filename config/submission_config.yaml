@@ -47,16 +47,17 @@ models:
   classifier_type: "one_layer" # ["one_layer", "two_layer_act"]
   freeze_plant_head: True # if true, freeze the plant head
   freeze_organ_head: True # if true, freeze the organ head
+  random_forest: "forest.pkl"
 
 
 merge:
   enabled: False # only for 5 heads model
   species_model:
-    load_5heads_model: False # if true, load the 5 heads model
+    load_5heads_model: True # if true, load the 5 heads model
     pretrained: False
     name: "vit_base_patch14_reg4_dinov2.lvd142m"
     folder: "models/"
-    checkpoint_file: "model_onlyclassifier_then_all/model_best.pth.tar"
+    checkpoint_file: "saved_models/5heads_vit_base_patch14_reg4_dinov2.lvd142m-classifier-then-all/final_model"
     classifier_type: "one_layer" # ["one_layer", "two_layer_act"]
     freeze_backbone: True # if true, freeze the backbone
     freeze_species_head: False # if true, just keep the original species head
@@ -68,7 +69,7 @@ merge:
     name: "vit_base_patch14_reg4_dinov2.lvd142m"
     pretrained: False
     folder: "models/"
-    checkpoint_file: "saved_models/5heads_vit_base_patch14_reg4_dinov2.lvd142m-classifier-then-all-2layers/checkpoint_ep2_it4000/"
+    checkpoint_file: "saved_models/5heads_vit_base_patch14_reg4_dinov2.lvd142m-classifier-then-all-2layers/checkpoint_ep2_it1000/"
     classifier_type: "two_layer_act" # ["one_layer", "two_layer_act"]
     freeze_backbone: True # if true, freeze the backbone
     freeze_species_head: False # if true, just keep the original species head
@@ -80,7 +81,7 @@ merge:
     pretrained: False
     name: "vit_base_patch14_reg4_dinov2.lvd142m"
     folder: "models/"
-    checkpoint_file: "saved_models/5heads_vit_base_patch14_reg4_dinov2.lvd142m-classifier-then-all-2layers/checkpoint_ep2_it4000/"
+    checkpoint_file: "saved_models/5heads_vit_base_patch14_reg4_dinov2.lvd142m-classifier-then-all-2layers/checkpoint_ep2_it1000/"
     classifier_type: "two_layer_act" # ["one_layer", "two_layer_act"]
     freeze_backbone: True # if true, freeze the backbone
     freeze_species_head: False # if true, just keep the original species head
@@ -121,12 +122,13 @@ prediction:
     scales:
       # - 1.0
       # - 2.0
-      # - 4.0
+      # - 3.0
+      - 4.0
       - 5.0
       # - 8.0
     overlaps:
       - 0.0
-      # - 0.0
+      - 0.0
       # - 0.0
       # - 0.25
       # - 0.5
@@ -134,17 +136,19 @@ prediction:
   method: "top_k_tile" # One of ["top_k_tile", "BMA"]
   top_k_tile:
     k: 1
-    min_score: 0.4
+    min_score: 0.02
     top_n: -1 # if -1, use all predictions
+    bottom_n: 1 # if all species are below the threshold, get the bottom n species with the highest probs over all tiles
   BMA:
     z_score_threshold: 2.0
   filter_species_threshold: 0 # The predictions for images with less than this number of images will be filtered out
   combine_same_plot_threshold: 0 # The number of predictions required for a species to be added to the combined prediction of a plot at the same location. 0 to disable plot combination
   group_same_plot_by_year: False # if true and threshold is not 0, group the predictions of the same plot by year
+  predict_no_plant_threshold: 0
   kernel:
-    enabled: True # if true, add weighted neighbor prediction to a tile
+    enabled: False # if true, add weighted neighbor prediction to a tile
     type: "simple" # One of ["simple"]
-  crop_side_percent: 0.05 # The percentage of the image to crop from each side; if <= 0, use the whole image
+  crop_side_percent: 0.10 # The percentage of the image to crop from each side; if <= 0, use the whole image
 
 image_width: 518
 image_height: 518
@@ -152,6 +156,6 @@ image_height: 518
 # submission_file: "submission_5heads_vit_base_patch14_reg4_dinov2.lvd142m-lucas_model_0101249_no_gf_pred.csv"
 # submission_file: "submission_tile_5_overlaps_0_topk_1_5heads_lucas_153799_2layers.csv"
 # submission_file: "submission_5heads_2layers_ckpt_ep2_it4000_tile_5_overlaps_0_topk_1_minscore_001_topn_5_use_gf.csv"
-submission_file: "submission_5heads_1layer_tile_5_overlaps_0_topk_1_minscore_04_use_gf_crop_005_kernel_simple_1_05.csv"
+submission_file: "submission_5h1l_tile_4_5_overlaps_0_0_topk_1_minscore_002_use_gf_crop_010.csv"
 
 seed: 42

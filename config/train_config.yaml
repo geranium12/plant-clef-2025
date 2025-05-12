@@ -46,6 +46,7 @@ models:
   classifier_type: "two_layer_act" # ["one_layer", "two_layer_act"]
   freeze_plant_head: True # if true, freeze the plant head
   freeze_organ_head: True # if true, freeze the organ head
+  random_forest: "forest.pkl"
 
 merge:
   enabled: False # only for 5 heads model
@@ -124,16 +125,17 @@ prediction:
   top_k_tile:
     k: 1
     min_score: 0.01
-    top_n: -1 # if -1, use all predictions
+    bottom_n: 1 # if all species are below the threshold, get the bottom n species with the highest probs over all tiles
   BMA:
     z_score_threshold: 2.0
+  filter_species_threshold: 0 # The predictions for images with less than this number of images will be filtered out
   combine_same_plot_threshold: 0 # The number of predictions required for a species to be added to the combined prediction of a plot at the same location. 0 to disable plot combination
-  group_same_plot_by_year: false # if true and threshold is not 0, group the predictions of the same plot by year
+  group_same_plot_by_year: False # if true and threshold is not 0, group the predictions of the same plot by year
+  predict_no_plant_threshold: 0
   kernel:
     enabled: False # if true, add weighted neighbor prediction to a tile
-    kernel_type: "simple" # One of ["simple"]
-  crop_side_percent: -1 # The percentage of the image to crop from each side; if <= 0, use the whole image
-
+    type: "simple" # One of ["simple"]
+  crop_side_percent: 0 # The percentage of the image to crop from each side; if <= 0, use the whole image
 
 
 image_width: 518
