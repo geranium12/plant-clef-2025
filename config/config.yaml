@@ -45,7 +45,7 @@ models:
   freeze_plant_head: True # if true, freeze the plant head
   freeze_organ_head: True # if true, freeze the organ head
 
-merge:  # inference only
+merge: # inference only
   enabled: False # only for 5 heads model
   species_model:
     load_5heads_model: False # if true, load the 5 heads model
@@ -125,11 +125,13 @@ prediction:
   filter_species_threshold: 100 # The predictions for images with less than this number of images will be filtered out
   combine_same_plot_threshold: 0 # The number of predictions required for a species to be added to the combined prediction of a plot at the same location. 0 to disable plot combination
   group_same_plot_by_year: false # if true and threshold is not 0, group the predictions of the same plot by year
-  predict_no_plant_threshold: 0  
+  predict_no_plant_threshold: 0
   kernel:
     enabled: False # if true, add weighted neighbor prediction to a tile
     kernel_type: "simple" # One of ["simple"]
   crop_side_percent: -1 # The percentage of the image to crop from each side; if <= 0, use the whole image
+  save_probabilities: False
+  save_dir: "predictions/"
 
 image_width: 518
 image_height: 518

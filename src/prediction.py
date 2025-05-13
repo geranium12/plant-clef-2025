@@ -360,6 +360,16 @@ def predict(
                         )
                     )  # Shape: [tile_size * tile_size, num_classes]
 
+            if config.prediction.save_probabilities:
+                # Save the probabilities for each tile
+                save_path = os.path.join(
+                    config.prediction.save_dir,
+                    "probabilities",
+                    f"{quadrat_id}.npy",
+                )
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                np.save(save_path, image_tile_probabilities.cpu().numpy())
+
             image_results: dict[int, float] = {}
             match config.prediction.method:
                 case "top_k_tile":

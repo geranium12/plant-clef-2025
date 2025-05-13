@@ -49,7 +49,6 @@ models:
   freeze_organ_head: True # if true, freeze the organ head
   random_forest: "forest.pkl"
 
-
 merge:
   enabled: False # only for 5 heads model
   species_model:
@@ -87,7 +86,6 @@ merge:
     freeze_species_head: False # if true, just keep the original species head
     freeze_plant_head: True # if true, freeze the plant head
     freeze_organ_head: True # if true, freeze the organ head
-
 
 training:
   enabled: False # if true, train the model
@@ -137,7 +135,7 @@ prediction:
   top_k_tile:
     k: 1
     min_score: 0.02
-    top_n: -1 # if -1, use all predictions
+    top_n: 10 # if -1, use all predictions
     bottom_n: 1 # if all species are below the threshold, get the bottom n species with the highest probs over all tiles
   BMA:
     z_score_threshold: 2.0
@@ -149,6 +147,8 @@ prediction:
     enabled: False # if true, add weighted neighbor prediction to a tile
     type: "simple" # One of ["simple"]
   crop_side_percent: 0.10 # The percentage of the image to crop from each side; if <= 0, use the whole image
+  save_probabilities: True
+  save_dir: "predictions/"
 
 image_width: 518
 image_height: 518
@@ -156,6 +156,6 @@ image_height: 518
 # submission_file: "submission_5heads_vit_base_patch14_reg4_dinov2.lvd142m-lucas_model_0101249_no_gf_pred.csv"
 # submission_file: "submission_tile_5_overlaps_0_topk_1_5heads_lucas_153799_2layers.csv"
 # submission_file: "submission_5heads_2layers_ckpt_ep2_it4000_tile_5_overlaps_0_topk_1_minscore_001_topn_5_use_gf.csv"
-submission_file: "submission_5h1l_tile_4_5_overlaps_0_0_topk_1_minscore_002_use_gf_crop_010.csv"
+submission_file: "submission_5h1l_tile_4_5_overlaps_0_0_topk_1_minscore_002_top_n_10_use_gf_crop_010.csv"
 
 seed: 42

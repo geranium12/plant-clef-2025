@@ -136,7 +136,8 @@ prediction:
     enabled: False # if true, add weighted neighbor prediction to a tile
     type: "simple" # One of ["simple"]
   crop_side_percent: 0 # The percentage of the image to crop from each side; if <= 0, use the whole image
-
+  save_probabilities: False
+  save_dir: "predictions/"
 
 image_width: 518
 image_height: 518
