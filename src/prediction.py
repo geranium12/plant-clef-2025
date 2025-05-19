@@ -364,7 +364,6 @@ def predict(
                 # Save the probabilities for each tile
                 save_path = os.path.join(
                     config.prediction.save_dir,
-                    "probabilities",
                     f"{quadrat_id}.npy",
                 )
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
