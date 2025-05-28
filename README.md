@@ -1,5 +1,6 @@
 # plant-clef-2025
-https://www.kaggle.com/competitions/plantclef-2025/overview
+
+[Kaggle Challenge](https://www.kaggle.com/competitions/plantclef-2025/overview)
 
 ## Contributing
 
@@ -29,3 +30,9 @@ Then, set `CUDA_VISIBLE_DEVICES` and `main_process_port` to a random free port (
 ```bash
 CUDA_VISIBLE_DEVICES=2,3 uv run accelerate launch --main_process_port=29523 pipeline.py
 ```
+
+You can specify the run configuration using `config/config.yaml`.
+
+The notebooks in `predictions/` can be used to merge logits from multiple models.
+
+The notebooks in `submissions/` can be used to analyze similarity between different predictions.
