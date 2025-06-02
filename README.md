@@ -16,12 +16,12 @@ A paper acompaniing this repository is available under the title ***"Multi-Label
 - [`config/`](./config/): Configuration files for the pipeline.
 - [`src/`](./src/): The main source code for the project.
 - [`test/`](./test/): The main test code for the project.
-- [`predictions/`](./predictions/README.md): Scripts related to prediction.
-- [`submissions/`](./submissions/README.md): Scripts related to evaluation and comparison of submissions.
-- [`utils/`](./utils/README.md): Utility scripts
-- [`notebooks/`](./notebooks/README.md): Jupyter notebooks for exploration and analysis.
-- [`docs/`](./docs/README.md): Documentation and information gathered during the project.
-- [`misc/`](./misc/README.md): Miscellaneous files and scripts.
+- [`predictions/`](./predictions/): Scripts related to prediction.
+- [`submissions/`](./submissions/): Scripts related to evaluation and comparison of submissions.
+- [`utils/`](./utils/): Utility scripts
+- [`notebooks/`](./notebooks/): Jupyter notebooks for exploration and analysis.
+- [`docs/`](./docs/): Documentation and information gathered during the project.
+- [`misc/`](./misc/): Miscellaneous files and scripts.
 
 ## Usage
 
