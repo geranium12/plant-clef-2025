@@ -1,22 +1,8 @@
 # plant-clef-2025
 
-![Banner Image of PlantCLEF 2025](./docs/banner.png)
-
 [2025 PlantCLEF Kaggle Challenge](https://www.kaggle.com/competitions/plantclef-2025/overview)
 
-## Contributing
-
-To contribute you need to install pre-commit hooks in your git repository.
-
-```bash
-uv run pre-commit install
-```
-
-To run the pre-commit hooks manually, use the following command.
-
-```bash
-uv run pre-commit run --all-files
-```
+![Banner Image of PlantCLEF 2025](./docs/banner.png)
 
 ## Usage
 
@@ -38,3 +24,17 @@ You can specify the run configuration using `config/config.yaml`.
 The notebooks in `predictions/` can be used to merge logits from multiple models.
 
 The notebooks in `submissions/` can be used to analyze similarity between different predictions.
+
+## Contributing
+
+To contribute you need to install pre-commit hooks in your git repository.
+
+```bash
+uv run pre-commit install
+```
+
+To run the pre-commit hooks manually, use the following command.
+
+```bash
+uv run pre-commit run --all-files
+```

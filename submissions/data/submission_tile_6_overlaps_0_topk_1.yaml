@@ -1,9 +1,0 @@
-score: 0.25618
-prediction:
-  tiling:
-    scales:
-      - 6.0
-    overlaps:
-      - 0.0
-  top_k_tile:
-    k: 1
