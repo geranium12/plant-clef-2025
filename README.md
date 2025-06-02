@@ -1,10 +1,15 @@
-# plant-clef-2025
+# 3rd place solution for competition "PlantCLEF2025 @ LifeCLEF & CVPR-FGVC" on Kaggle
 
 ![Banner Image of PlantCLEF 2025](./docs/banner.png)
 
 This repository contains our code for the [2025 PlantCLEF Kaggle Challenge](https://www.kaggle.com/competitions/plantclef-2025/overview)
 
-A paper acompaniing this repository is available under the title ***"Multi-Label Plant Species Prediction with Metadata-Enhanced Multi-Head Vision Transformers"***.
+A paper accompanying this repository is available under the title ***"Multi-Label Plant Species Prediction with Metadata-Enhanced Multi-Head Vision Transformers"***.
+
+Our team:
+- Hanna Herasimchyk [[LinkedIn]](https://www.linkedin.com/in/hanna-herasimchyk/)
+- Robin Labryga [[Homepage]](https://robinlabryga.github.io/)
+- Tomislav Prusina [[TODO]()]
 
 ## Abstract
 
