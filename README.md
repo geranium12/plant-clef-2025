@@ -1,6 +1,8 @@
 # plant-clef-2025
 
-[Kaggle Challenge](https://www.kaggle.com/competitions/plantclef-2025/overview)
+![Banner Image of PlantCLEF 2025](./docs/banner.png)
+
+[2025 PlantCLEF Kaggle Challenge](https://www.kaggle.com/competitions/plantclef-2025/overview)
 
 ## Contributing
 
