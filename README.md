@@ -13,7 +13,8 @@ Our team:
 
 ## Abstract
 
-<!-- TODO -->
+This paper presents a multi-head vision transformer approach for multi-label plant species prediction in vegetation plot images, addressing the PlantCLEF 2025 challenge. The task involves training models on single-species plant images while testing on multi-species quadrat images, creating a drastic domain shift.
+Our methodology leverages a pre-trained DINOv2 Vision Transformer Base (ViT-B/14) backbone with multiple classification heads for species, genus, and family prediction, utilizing taxonomic hierarchies. Key contributions include multi-scale tiling to capture plants at different scales, dynamic threshold optimization based on mean prediction length, and ensemble strategies through bagging and Hydra model architectures. The approach incorporates various inference techniques including image cropping to remove non-plant artifacts, top-n filtering for prediction constraints, and logit thresholding strategies. Experiments were conducted on approximately 1.4 million training images covering 7,806 plant species. Results demonstrate strong performance, making our submission 3rd best on the private leaderboard.
 
 ## Project Structure
 
@@ -61,4 +62,11 @@ uv run pre-commit run --all-files
 
 ## Citation
 
-<!-- TODO -->
+```tex
+@article{fiaschi2024informed,
+  title={Multi-Label Plant Species Prediction with Metadata-Enhanced Multi-Head Vision Transformers},
+  author={Harasimchyk, Hanna and Labryga, Robin and Prusina, Tomislav},
+  year={2025}
+}
+<!-- TODO: Add journal -->
+```
