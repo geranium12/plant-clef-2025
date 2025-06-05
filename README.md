@@ -9,7 +9,7 @@ A paper accompanying this repository is available under the title ***"Multi-Labe
 Our team:
 - Hanna Herasimchyk [[Homepage]](https://geranium12.github.io/)
 - Robin Labryga [[Homepage]](https://robinlabryga.github.io/)
-- Tomislav Prusina [[TODO]()]
+- Tomislav Prusina [[Homepage]](https://tomo61098.github.io/)
 
 ## Abstract
 
