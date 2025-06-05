@@ -63,7 +63,7 @@ uv run pre-commit run --all-files
 ## Citation
 
 ```tex
-@article{fiaschi2024informed,
+@article{harasimchyk2025multilabel,
   title={Multi-Label Plant Species Prediction with Metadata-Enhanced Multi-Head Vision Transformers},
   author={Harasimchyk, Hanna and Labryga, Robin and Prusina, Tomislav},
   year={2025}
