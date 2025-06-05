@@ -68,5 +68,5 @@ uv run pre-commit run --all-files
   author={Harasimchyk, Hanna and Labryga, Robin and Prusina, Tomislav},
   year={2025}
 }
-<!-- TODO: Add journal -->
 ```
+<!-- TODO: Add journal -->
