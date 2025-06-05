@@ -7,7 +7,7 @@ This repository contains our code for the [2025 PlantCLEF Kaggle Challenge](http
 A paper accompanying this repository is available under the title ***"Multi-Label Plant Species Prediction with Metadata-Enhanced Multi-Head Vision Transformers"***.
 
 Our team:
-- Hanna Herasimchyk [[LinkedIn]](https://www.linkedin.com/in/hanna-herasimchyk/)
+- Hanna Herasimchyk [[Homepage]](https://geranium12.github.io/)
 - Robin Labryga [[Homepage]](https://robinlabryga.github.io/)
 - Tomislav Prusina [[TODO]()]
 
