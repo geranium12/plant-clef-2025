@@ -63,11 +63,10 @@ uv run pre-commit run --all-files
 ## Citation
 
 ```tex
-@article{harasimchyk2025multilabel,
-  title={Multi-Label Plant Species Prediction with Metadata-Enhanced Multi-Head Vision Transformers},
-  author={Harasimchyk, Hanna and Labryga, Robin and Prusina, Tomislav},
-  url = {https://github.com/geranium12/plant-clef-2025},
-  year={2025}
+@inproceedings{herasimchyk2025multilabel,
+      author={Hanna Herasimchyk and Robin Labryga and Tomislav Prusina},
+      title={Multi-Label Plant Species Prediction with Metadata-Enhanced Multi-Head Vision Transformers}, 
+      booktitle={Working Notes of CLEF (Conference and Labs of the Evaluation Forum)}
+      year={2025},
 }
 ```
-<!-- TODO: Add journal -->
